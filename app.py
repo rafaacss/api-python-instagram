@@ -1,10 +1,10 @@
 import os
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from dotenv import load_dotenv
 
 load_dotenv()
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
@@ -191,6 +191,33 @@ def get_user_posts():
             except ValueError:
                 error_payload["details"] = e.response.text
         return jsonify(error_payload), getattr(e.response, 'status_code', 500)
+
+ALLOWED_EXTENSIONS = {'.json', '.js'}
+
+def allowed_file(filename):
+    ext = os.path.splitext(filename)[1]
+    return ext in ALLOWED_EXTENSIONS
+
+@app.route('/static/instagram/<filename>')
+def serve_static_instagram(filename):
+    if not allowed_file(filename):
+        abort(404)
+    filepath = os.path.join('static', 'instagram', filename)
+    if not os.path.isfile(filepath):
+        abort(404)
+
+    # Serve o arquivo correto com o mimetype apropriado
+    ext = os.path.splitext(filename)[1]
+    if ext == '.json':
+        mimetype = 'application/json'
+    elif ext == '.js':
+        mimetype = 'application/javascript'
+    else:
+        mimetype = 'application/octet-stream'  # fallback seguro
+
+    with open(filepath, 'rb') as f:
+        content = f.read()
+    return Response(content, mimetype=mimetype)
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
