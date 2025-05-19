@@ -130,6 +130,6 @@
         }
       }
     },
-    "assets":["https://api-instagram.redbeauty.com.br/static/instashow.js"]
+    "assets":["https://api-instagram.redbeauty.com.br/static/instagram/instashow.js"]
   }
 }
