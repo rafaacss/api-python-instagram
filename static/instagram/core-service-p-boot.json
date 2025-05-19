@@ -1,0 +1,135 @@
+{"status":1,
+  "data":{
+    "widgets":{
+      "redbeauty":{
+        "status":1,
+        "data":{
+          "app":"instagram-feed",
+          "settings":{
+            "storageApiUrl":"https://storage.elfsight.com/api/v2/data/",
+            "accessToken":"",
+            "apiProxyUrl":null,
+            "sourceType":"mixed",
+            "personalAccessToken":"",
+            "businessAccessToken":"",
+            "businessAccount":null,
+            "businessHashtag":"#eiffeltower",
+            "storageSource":[],
+            "dataServiceSource":[{
+              "id":"9ed03c7e-8471-494b-bcc0-92d4888b73c0",
+              "name":"1rdbeauty",
+              "type":"account",
+              "connectionStatus":"success",
+              "connectionType":"public",
+              "pid":"84d59329-17c5-43c6-9d2d-07e7f2b1f966",
+              "authData":{}}],
+            "usesDataService":true,
+            "filterOnly":[],
+            "filterExcept":[],
+            "filter":null,
+            "limit":0,
+            "order":"date",
+            "headerEnabled":true,
+            "headerElements":[
+              "profilePicture","fullName","username","verifiedBadge","postsCount","followersCount","followingCount","followButton"
+            ],
+            "layout":"slider",
+            "postLayout":"tile",
+            "columnsMode":"auto",
+            "columns":4,
+            "rows":2,
+            "gutter":0,
+            "responsive":[
+              {
+                "id":"6343fca1a99cf",
+                "minWidth":"375",
+                "columns":"1",
+                "rows":"1",
+                "gutter":"0"
+              },{
+                "id":"6343fca1a9a2e",
+                "minWidth":"768",
+                "columns":"3",
+                "rows":"2",
+                "gutter":"0"
+              }
+            ],
+            "width":"auto",
+            "callToActionButtons":[
+              {
+                "id":"6343fca18f8d7",
+                "postUrl":"https://www.instagram.com/p/Bmr7eH0nyxQ/",
+                "buttonLink":"https://elfsight.com/instagram-feed-instashow/",
+                "buttonLabel":"Get Instagram Feed now"
+              },
+              {
+                "id":"6343fca18f92f",
+                "postUrl":"https://www.instagram.com/p/BmgZy5FnnQB/",
+                "buttonLink":"https://elfsight.com/instagram-feed-instashow/",
+                "buttonLabel":"Get Instagram Feed now"
+              },
+              {
+                "id":"6343fca18f979",
+                "postUrl":"https://www.instagram.com/p/BmbbCfBndRU/",
+                "buttonLink":"https://elfsight.com/instagram-feed-instashow/",
+                "buttonLabel":"Get Instagram Feed now"
+              }
+            ],
+            "postElements":[
+              "user","date","instagramLink","likesCount","commentsCount","share","text"
+            ],
+            "popupElements":[
+              "user","location","followButton","instagramLink","likesCount","share","text","comments","date"
+            ],
+            "imageAspectRatio":"1/1",
+            "imageClickAction":"popup",
+            "sliderArrows":true,
+            "sliderDrag":true,
+            "sliderSpeed":0.6,
+            "sliderAutoplay":"",
+            "colorScheme":"dark",
+            "colorSchemeCustomColors":{},
+            "colorHeaderBg":"rgb(28, 27, 27)",
+            "colorHeaderText":"rgb(255, 255, 255)",
+            "colorHeaderFollowButton":"rgb(0, 149, 246)",
+            "colorHeaderFollowButtonText":"rgb(255, 255, 255)",
+            "colorPostBg":"rgb(28, 27, 27)",
+            "colorPostText":"rgb(255, 255, 255)",
+            "colorPostLinks":"rgb(255, 255, 255)",
+            "colorPostOverlayBg":"rgba(28, 27, 27, 0.9)",
+            "colorPostOverlayText":"rgb(255, 255, 255)",
+            "colorSliderArrows":"rgb(176, 176, 176)",
+            "colorSliderArrowsBg":"rgba(255, 255, 255, 0.9)",
+            "colorGridLoadMoreButton":"",
+            "colorPopupOverlay":"rgba(0, 0, 0, 0.9)",
+            "colorPopupBg":"rgb(28, 27, 27)",
+            "colorPopupText":"rgb(255, 255, 255)",
+            "colorPopupLinks":"rgb(30, 136, 241)",
+            "colorPopupFollowButton":"rgb(30, 136, 241)",
+            "colorPopupCtaButton":"rgb(30, 136, 241)",
+            "widgetTitle":"",
+            "lang":"pt-BR",
+            "cacheTime":3600,
+            "popupDeepLinking":false,
+            "debug":false,
+            "widgetId":"7d812c10-bcfd-4950-a029-d71810d13b59",
+            "apiChangesMessage":null,"source":[],"postTemplate":"tile","customCSS":"","template":"840a1d63-4622-46c9-9ebd-cb48a8da3b56",
+            "customJS":""},"user":{"owner":true},"percentage":0.01,"preferences":{"hide_elfsight_logo":0,"disable_widget":0,
+            "deactivated_widget_url":"https://dash.elfsight.com/apps/instagram-feed/pricing?claim=removeBranding&claim=increaseViews",
+            "display_deactivation":false,"deactivation_url":"https://dash.elfsight.com/apps/instagram-feed/pricing?claim=removeBranding&claim=increaseViews",
+            "display_free_link":false,"display_free_link_remove":false,"free_link_anchor":"Free Instagram Feed widget",
+            "free_link_url":"https://elfsight.com/instagram-feed-instashow/?utm_source=websites&utm_medium=clients&utm_content=instagram-feed&utm_term=%website_domain%&utm_campaign=free-widget",
+            "free_link_remove_url":"https://dash.elfsight.com/apps/instagram-feed/pricing?claim=removeBranding&claim=removeBranding"},
+          "meta":{
+            "widget_name":"Untitled Instagram Feed",
+            "app_name":"Instagram Feed",
+            "app_version":"5.6.5",
+            "thumbnail_url":"https://services-universe-prod.sfo3.digitaloceanspaces.com/widget-thumbnails/2c6fe42c-be6d-4a06-9204-871c6d78c3ba@2x.png"
+          },
+          "public_widget_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoiUFVCTElDIiwid2lkZ2V0UGlkIjoiN2Q4MTJjMTAtYmNmZC00OTUwLWEwMjktZDcxODEwZDEzYjU5Iiwid2lkZ2V0UmV2aXNpb25QaWQiOiJmMjE1ZjBlMi0zZWQ2LTQ0MDAtOGQ2Ni0zNDcyYjkzZmYzMjEiLCJhcHAiOiJpbnN0YWdyYW0tZmVlZCIsImFjY291bnRQaWQiOiI4ODY5ZTYzOS0xMjQ3LTRjNjgtYTIxZi1jNTQxYzY1YWZjM2IiLCJzdWIiOiI3ZDgxMmMxMC1iY2ZkLTQ5NTAtYTAyOS1kNzE4MTBkMTNiNTkiLCJ2ZXIiOiJmMjE1ZjBlMi0zZWQ2LTQ0MDAtOGQ2Ni0zNDcyYjkzZmYzMjEiLCJpYXQiOjE3NDc0MjU1MzgsImV4cCI6MTc0NzU5ODMzOH0.wgA-sIrIMbXNrEO6yYfqJ9tD8aetZfvDkipvQgLFHSJpj4SZRlMKt4PaLhw18PRLBfuq4ErlK4c5dmTnv8JgVcb21a4uTD93AuMV4_wSt4TcUi3QWVv-inWlVdH0dSZZrmjdO-fTIHhy91XGKq0bw2l0AmMYBKZYBSH7dldIO3J933SPZmuyt-tDA1st21NR7Pa7PuI7ugGROCbcp3iPAxApW81771SqLF6HiYH5GGPMUNSh9eOmoP9Iu3oc0pdlFu0j19E5sPunuBczLkwrcS5rZjeUZ_as4_8oVGk6hDTI__wmdfVtqe-qhKvtCuKsBXCNk4lVUtec-fucqV4Cmmn2LJTBKOYfIWdzbDg3wbBrhB0IhyD1BJWE3iORLC4-v2DyX_zwNxVWuRg9aF4mtx4lmFIema_3DJJ4q3hirVs97TUNZ-dEybxFEzGI8hgiMFXrzHNiww4Wq0sOqBnIXurWMrfB7KRc6wRyzKOUe4UREYcQR8VUHU0d0fx5D7rHXYkRUMDcTXaZN1FW4d-kibBQreG-StVzi3vFjufG7o86IDsNxs4J-AgpXORbyaFDJE-7WYOPmvA2YYJb7AiTQyZYDhb00mGhPSw1hQepyaRgbvlKYla4tGCSCfUwfZn8zL-nnhbV7nR977YVsdMWVcDX5S8szx4_kPaiVU39CcU"
+        }
+      }
+    },
+    "assets":["https://api-instagram.redbeauty.com.br/static/instashow.js"]
+  }
+}

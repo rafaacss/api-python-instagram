@@ -1,0 +1,17 @@
+{
+  "name": "api-python-instagram",
+  "version": "1.0.0",
+  "description": "",
+  "main": "script-instagram.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rafaacss/api-python-instagram.git"
+  },
+  "private": true,
+  "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.4"
+  }
+}
