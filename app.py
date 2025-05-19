@@ -3,10 +3,10 @@ import requests
 from flask import Flask, jsonify, request, send_file, Response
 from dotenv import load_dotenv
 from flask_cors import CORS
-CORS(app)
 
 load_dotenv()
 app = Flask(__name__, static_folder='static')
+CORS(app)
 
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
