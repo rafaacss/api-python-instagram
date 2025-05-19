@@ -2,6 +2,8 @@ import os
 import requests
 from flask import Flask, jsonify, request, send_file, Response
 from dotenv import load_dotenv
+from flask_cors import CORS
+CORS(app)
 
 load_dotenv()
 app = Flask(__name__, static_folder='static')
