@@ -9876,9 +9876,9 @@
         var be = n(5064),
             xe = n.n(be);
         const ke = e => `https://www.instagram.com/${e}`,
-            Ce = "user_profile",
+            Ce = "user_profile?v="+ + Date.now(),
             Se = "api/source",
-            Le = "posts",
+            Le = "posts?v="+ + Date.now(),
             Ie = "api/dynamic/posts",
             Ee = "public",
             Pe = "account",
