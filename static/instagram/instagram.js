@@ -293,7 +293,7 @@
                                     b.logError("Boot failed because (mocked) " + t_response_simulated.reason, t_response_simulated.data);
                                 }
                                 v = Object.assign({}, v, t_response_simulated.data.widgets);
-                                b.loadAssets(t_response_simulated.data.assets);
+                                b.loadAssets(t_response_simulated.data.assets+'?v='+ Date.now());
                                 m.forEach(b.initWidget.bind(b));
                                 x = x.filter(function (widgetId_processed) {
                                     return !i.includes(widgetId_processed);
