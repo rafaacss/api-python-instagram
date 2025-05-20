@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, jsonify, request, send_file, Response
+from flask import Flask, jsonify, request, send_file, Response, send_from_directory
 from dotenv import load_dotenv
 from flask_cors import CORS
 
@@ -199,7 +199,11 @@ def allowed_file(filename):
     ext = os.path.splitext(filename)[1]
     return ext in ALLOWED_EXTENSIONS
 
-@app.route('/static/instagram/<filename>')
+@app.route('/static/instagram/<path:filename>')
+def serve_instagram_static(filename):
+    return send_from_directory('static/instagram', filename)
+
+@app.route('/static/instagramm/<filename>')
 def serve_static_instagram(filename):
     if not allowed_file(filename):
         abort(404)
