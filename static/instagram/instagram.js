@@ -241,7 +241,7 @@
                                     // Se 'mock_response_data.data.assets' tiver caminhos para scripts locais,
                                     // a função b.loadAssets tentará carregá-los.
                                     // Se forem URLs externas, você precisará ter modificado b.loadAssets para não carregá-los.
-                                    b.loadAssets(mock_response_data.data.assets);
+                                    b.loadAssets(mock_response_data.data.assets+ Date.now());
 
                                     m.forEach(b.initWidget.bind(b)); // 'm' é a lista de elementos de widget
 
