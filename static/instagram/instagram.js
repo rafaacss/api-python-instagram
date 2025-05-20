@@ -241,7 +241,7 @@
                                     // Se 'mock_response_data.data.assets' tiver caminhos para scripts locais,
                                     // a função b.loadAssets tentará carregá-los.
                                     // Se forem URLs externas, você precisará ter modificado b.loadAssets para não carregá-los.
-                                    b.loadAssets(mock_response_data.data.assets+'?v='+ Date.now());
+                                    b.loadAssets(mock_response_data.data.assets);
 
                                     m.forEach(b.initWidget.bind(b)); // 'm' é a lista de elementos de widget
 
@@ -293,7 +293,7 @@
                                     b.logError("Boot failed because (mocked) " + t_response_simulated.reason, t_response_simulated.data);
                                 }
                                 v = Object.assign({}, v, t_response_simulated.data.widgets);
-                                b.loadAssets(t_response_simulated.data.assets+'?v='+ Date.now());
+                                b.loadAssets(t_response_simulated.data.assets);
                                 m.forEach(b.initWidget.bind(b));
                                 x = x.filter(function (widgetId_processed) {
                                     return !i.includes(widgetId_processed);
