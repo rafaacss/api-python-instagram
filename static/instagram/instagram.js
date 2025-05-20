@@ -696,7 +696,8 @@
                             e.initWidget(n, l, o),
                             o.isOwner &&
                             setTimeout(function () {
-                                 t.initToolbar(n, o);
+                                // t.initToolbar(n, o);
+                                console.log('initToolbar', n, o);
                             }, 500);
                         } else r.push({ element: n, config: o, initialized: !1 });
                     }),

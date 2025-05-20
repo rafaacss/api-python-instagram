@@ -30,7 +30,7 @@
             "filter":null,
             "limit":0,
             "order":"date",
-            "headerEnabled":true,
+            "headerEnabled":false,
             "headerElements":[
               "profilePicture","fullName","username","verifiedBadge","postsCount","followersCount","followingCount","followButton"
             ],

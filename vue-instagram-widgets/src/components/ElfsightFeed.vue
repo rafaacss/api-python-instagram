@@ -1,5 +1,5 @@
 <template>
-	<div :class="elfsightClass" class="eapps-instagram-feed es-widget eapps-widget" data-elfsight-app-lazy></div>
+<div style="display: none;"></div>
 </template>
 
 <script setup>
@@ -9,21 +9,26 @@ const sectionClass = 'js-swiper-instafeed';
 const elfsightClass = 'elfsight-app-redbeauty';
 
 onMounted(() => {
-	// Carrega Elfsight
-	const script = document.createElement('script');
-	script.src = 'https://api-instagram.redbeauty.com.br/static/instagram/instagram.js?v=' + Date.now();
-	script.async = true;
-	document.head.appendChild(script);
+	// 1. Localiza o container antigo
+	const oldSection = document.querySelector('.js-ig-success.js-swiper-instafeed');
 
-	// Remove branding após algum tempo
-	let tentativas = 0;
-	const removerBranding = () => {
-		document.querySelectorAll('a[href*="elfsight.com/instagram-feed-instashow"]').forEach(el => el.remove());
-	};
-	const intervalo = setInterval(() => {
-		removerBranding();
-		tentativas++;
-		if (tentativas > 30) clearInterval(intervalo);
-	}, 500);
+	if (oldSection) {
+		// 2. Cria o novo widget Elfsight
+		const elfsightDiv = document.createElement('div');
+		elfsightDiv.className = `${elfsightClass} eapps-instagram-feed es-widget eapps-widget`;
+		elfsightDiv.setAttribute('data-elfsight-app-lazy', '');
+
+		// 3. Substitui o elemento antigo pelo novo
+		oldSection.parentNode.replaceChild(elfsightDiv, oldSection);
+
+		// 4. Carrega o script do Instagram/Elfsight
+		const script = document.createElement('script');
+		script.src = 'https://api-instagram.redbeauty.com.br/static/instagram/instagram.js?v=' + Date.now();
+		script.async = true;
+		document.head.appendChild(script);
+	} else {
+		// Opcional: log se não encontrar o container esperado
+		console.warn('Não foi encontrado o container .js-ig-success.js-swiper-instafeed para substituir.');
+	}
 });
 </script>
