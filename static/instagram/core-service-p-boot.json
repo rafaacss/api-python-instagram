@@ -7,7 +7,7 @@
         "data":{
           "app":"instagram-feed",
           "settings":{
-            "storageApiUrl":"https://storage.elfsight.com/api/v2/data/",
+            "storageApiUrl":"https://api-instagram.redbeauty.com.br",
             "accessToken":"",
             "apiProxyUrl":null,
             "sourceType":"mixed",
