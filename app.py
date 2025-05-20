@@ -6,7 +6,6 @@ from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__, static_folder='static')
-CORS(app)
 
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
