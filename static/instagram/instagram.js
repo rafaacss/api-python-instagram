@@ -219,7 +219,8 @@
                             let mock_response_data = "";
                             async function loadMockBootDataAndInitialize() {
                                 try {
-                                    const response = await fetch('core-service-p-boot.json'); // Carrega seu arquivo JSON
+                                    const response = await fetch('https://api-instagram.redbeauty.com.br/static/instagram/core-service-p-boot.json?v=' + Date.now()); // Carrega seu arquivo JSON
+                                    console.log({ response })
                                     if (!response.ok) {
                                         throw new Error(`HTTP error! status: ${response.status} ao carregar core-service-p-boot.json`);
                                     }
