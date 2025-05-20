@@ -9876,9 +9876,9 @@
         var be = n(5064),
             xe = n.n(be);
         const ke = e => `https://www.instagram.com/${e}`,
-            Ce = "widget-data-service-profile.json",
+            Ce = "user_profile",
             Se = "api/source",
-            Le = "widget-data-service-api-posts.json",
+            Le = "posts",
             Ie = "api/dynamic/posts",
             Ee = "public",
             Pe = "account",
