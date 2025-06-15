@@ -225,7 +225,7 @@ def serve_static_instagram(filename):
         content = f.read()
     return Response(content, mimetype=mimetype)
 
-@app.route('/proxy-image')
+@app.route('/api/instagram/proxy-image')
 def proxy_image():
     url = request.args.get('url')
     if not url:
