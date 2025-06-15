@@ -9841,7 +9841,7 @@
                     })
                 }
                 proxyImg(e) {
-                    return `${encodeURIComponent(e)}`
+                    return `${e}`
                 }
                 isNullish(e) {
                     return void 0 === e || null === e
