@@ -9841,7 +9841,7 @@
                     })
                 }
                 proxyImg(e) {
-                    return `https://phosphor.utils.elfsightcdn.com/?url=${encodeURIComponent(e)}`
+                    return `${encodeURIComponent(e)}`
                 }
                 isNullish(e) {
                     return void 0 === e || null === e
