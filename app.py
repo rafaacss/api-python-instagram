@@ -225,5 +225,22 @@ def serve_static_instagram(filename):
         content = f.read()
     return Response(content, mimetype=mimetype)
 
+@app.route('/proxy-image')
+def proxy_image():
+    url = request.args.get('url')
+    if not url:
+        return Response('Missing URL', status=400)
+    # Segurança: permite apenas imagens do domínio Instagram CDN
+    if not url.startswith('https://scontent') and not url.startswith('https://instagram'):
+        return Response('Blocked domain', status=403)
+    try:
+        r = requests.get(url, stream=True, timeout=8)
+        r.raise_for_status()
+        content_type = r.headers.get('Content-Type', 'image/jpeg')
+        # Evita download, só mostra imagem
+        return Response(r.content, content_type=content_type)
+    except Exception as e:
+        return Response(f'Error: {e}', status=500)
+
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
