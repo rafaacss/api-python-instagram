@@ -7,12 +7,14 @@ from flask_cors import CORS
 load_dotenv()
 app = Flask(__name__, static_folder='static')
 CORS(app)
+api_cache = {}
 
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
 GRAPH_API_URL = 'https://graph.instagram.com/v22.0'
-api_cache = {}
 CACHE_DURATION_SECONDS = 300
+PLACE_ID = os.getenv('GOOGLE_PLACE_ID')
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 def get_from_cache(key):
     return api_cache.get(key)
@@ -78,6 +80,29 @@ def proxy_image():
         return Response(r.content, content_type=content_type)
     except Exception as e:
         return Response(f'Error: {e}', status=500)
+
+@app.route('/api/google/reviews')
+def google_reviews():
+    try:
+        reviews = get_google_reviews()
+        return jsonify({"code": 200, "payload": reviews})
+    except Exception as e:
+        return jsonify({"code": 500, "error": str(e)})
+
+
+def get_google_reviews():
+    url = (
+        "https://maps.googleapis.com/maps/api/place/details/json"
+        f"?place_id={PLACE_ID}"
+        f"&fields=reviews,rating,user_ratings_total,name"
+        f"&key={GOOGLE_API_KEY}"
+    )
+    response = requests.get(url)
+    data = response.json()
+    if "result" in data and "reviews" in data["result"]:
+        return data["result"]["reviews"]
+    else:
+        return []
 
 @app.route('/api/instagram/posts', methods=['GET'])
 def get_user_posts():
