@@ -356,8 +356,7 @@ onUnmounted(() => {
   line-height: 1.6;
   color: #333;
   overflow-x: hidden;
-  background: #f8f9fa;
-  margin-left: 120px;
+  margin-left: 60px;
   padding-right: 20px;
 }
 
@@ -537,8 +536,7 @@ onUnmounted(() => {
   margin-bottom: 2rem;
   border-radius: 20px;
   position: relative;
-  background: white;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  background: transparent;
 }
 
 .salon-section-title {
