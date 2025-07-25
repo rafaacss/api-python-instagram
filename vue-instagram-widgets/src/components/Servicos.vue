@@ -90,7 +90,7 @@ const serviceSections = [
     title: 'Cabelo & Tratamentos Capilares',
     services: [
       {
-        image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        image: 'https://instagram.fbsb8-2.fna.fbcdn.net/v/t39.30808-6/417681068_18300561808176598_6371510864566069594_n.jpg?stp=dst-jpg_e35_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQuaW1hZ2VfdXJsZ2VuLjEwNjJ4MTA2Mi5zZHIuZjMwODA4LmRlZmF1bHRfaW1hZ2UuYzIifQ&_nc_ht=instagram.fbsb8-2.fna.fbcdn.net&_nc_cat=110&_nc_oc=Q6cZ2QEau7whZvwQiJAn-zVS7fpAtJIX9O3tHbECzlCX1Jufpc7nZxXTRPhr08GiNy7p_a7DJylj7uXaujrPR1UctF80&_nc_ohc=8jhcakrUC3MQ7kNvwHpzLLy&_nc_gid=Ls-aVB64hGYVq3ofkGBJzw&edm=AP4sbd4AAAAA&ccb=7-5&ig_cache_key=MzI3NTk3MTAyODc5MjU5NjMwNA%3D%3D.3-ccb7-5&oh=00_AfTINbddO6W8Aa7mVcKHqBBQWPbixZ249M343nC378q8zw&oe=68895D2A&_nc_sid=7a9f4b',
         icon: '✂️',
         title: 'Corte Personalizado',
         duration: 'Tempo médio: 40min',
@@ -132,14 +132,14 @@ const serviceSections = [
         description: 'Mãos e pés impecáveis! Corte, lixamento, tratamento de cutículas, hidratação, esfoliação e esmaltação (comum ou em gel) com higiene absoluta e produtos esterilizados em autoclave.'
       },
       {
-        image: 'https://images.unsplash.com/photo-1610992015732-2199de8dce7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        image: 'https://instagram.fbsb8-2.fna.fbcdn.net/v/t39.30808-6/468136908_18340910452176598_730674836187530744_n.jpg?stp=dst-jpg_e35_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQuaW1hZ2VfdXJsZ2VuLjExMjR4MTEyNC5zZHIuZjMwODA4LmRlZmF1bHRfaW1hZ2UuYzIifQ&_nc_ht=instagram.fbsb8-2.fna.fbcdn.net&_nc_cat=110&_nc_oc=Q6cZ2QEau7whZvwQiJAn-zVS7fpAtJIX9O3tHbECzlCX1Jufpc7nZxXTRPhr08GiNy7p_a7DJylj7uXaujrPR1UctF80&_nc_ohc=aAmw7JCZMVIQ7kNvwF-rdRn&_nc_gid=Ls-aVB64hGYVq3ofkGBJzw&edm=AP4sbd4AAAAA&ccb=7-5&ig_cache_key=MzI2NjU0Mzk1MDA5NzE5NTQwNw%3D%3D.3-ccb7-5&oh=00_AfQHZco4_Pja2IGjkBkwq4-vlWP-fpDt00LXyeYrCWQecw&oe=68893C34&_nc_sid=7a9f4b',
         icon: '💎',
         title: 'Extensão de Unhas',
         duration: 'Tempo médio: 2h30min',
         description: 'Unhas longas, resistentes e perfeitas! Alongamento personalizado com gel ou fibra para um visual elegante e duradouro.'
       },
       {
-        image: 'https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        image: 'https://instagram.fbsb8-2.fna.fbcdn.net/v/t39.30808-6/468399124_18340907899176598_1477111672666091062_n.jpg?stp=dst-jpg_e35_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQuaW1hZ2VfdXJsZ2VuLjE0MDZ4MTc1Ny5zZHIuZjMwODA4LmRlZmF1bHRfaW1hZ2UuYzIifQ&_nc_ht=instagram.fbsb8-2.fna.fbcdn.net&_nc_cat=110&_nc_oc=Q6cZ2QHD91RHivnC1xwm5ou0IPzv0CBUPYMNbO686-Ir2Ze-w5M4M05QlFU0WqngMNqoSt0yCW_93vvPBUQDQ9pocpgG&_nc_ohc=PF3xaR_iEdgQ7kNvwEtF-ZN&_nc_gid=O8hzOYq3zIB4pVWExiTMkw&edm=APoiHPcAAAAA&ccb=7-5&ig_cache_key=MzI1OTI0NDY2Njc3Mzg2MjE2Ng%3D%3D.3-ccb7-5&oh=00_AfQYiM_W6UvidfwGm7a8JwyO_zonjcYadXkGNm0h8WB_8g&oe=6889611F&_nc_sid=22de04',
         icon: '👁️',
         title: 'Extensão de Cílios Fio a Fio',
         duration: 'Tempo médio: 2h-2h30min',
@@ -603,7 +603,7 @@ onUnmounted(() => {
 
 .salon-service-image {
   width: 100%;
-  height: 200px;
+  height: 200px !important;
   object-fit: cover;
   border-radius: 15px;
   margin-bottom: 1.5rem;
