@@ -412,11 +412,12 @@ onUnmounted(() => {
   justify-content: center;
   text-decoration: none;
   color: white;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  padding: 1rem;
+  font-size: 14px;
+  font-family: Poppins, sans-serif;
+  font-weight: 600;
+  transition: all .3s ease-in-out;
+  padding: 0 5px;
   border-radius: 15px;
-  font-size: 0.9rem;
   text-align: center;
   min-height: 50px;
   position: relative;
@@ -437,7 +438,7 @@ onUnmounted(() => {
 
 .salon-nav-menu a:hover {
   background: linear-gradient(45deg, #ff4081, #e91e63);
-  color: white;
+  color: white !important;
   transform: translateX(5px);
   box-shadow: 0 5px 20px rgba(255, 64, 129, 0.4);
 }
