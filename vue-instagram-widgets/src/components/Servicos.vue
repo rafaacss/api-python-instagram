@@ -189,6 +189,7 @@ const serviceSections = [
         description: 'Desintoxicação e renovação! Higienização profunda com extração de impurezas, esfoliação, máscaras e hidratação para pele radiante e livre de cravos.'
       },
       {
+        image: 'https://instagram.fbsb8-2.fna.fbcdn.net/v/t39.30808-6/471376983_18344597866176598_5296820753157862240_n.jpg?stp=dst-jpg_e35_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQuaW1hZ2VfdXJsZ2VuLjEwODB4MTA4MC5zZHIuZjMwODA4LmRlZmF1bHRfaW1hZ2UuYzIifQ&_nc_ht=instagram.fbsb8-2.fna.fbcdn.net&_nc_cat=110&_nc_oc=Q6cZ2QHYRCYQ3BrK7t7oVzqwXc8KsoDXw14G6kfR0Hmp-FY5AHK_inq9EzV8Wla7RkeJ1SQi8i-oowO39g_qxwYzYMfs&_nc_ohc=TkRAB0Vr2UUQ7kNvwHVWf8E&_nc_gid=fMm2vcovuVW3dsPytIF18A&edm=APoiHPcAAAAA&ccb=7-5&ig_cache_key=MzM4NDQ5MTU2NjE1OTMwMDExMw%3D%3D.3-ccb7-5&oh=00_AfQ33RFzUyEXBvCPRXsvWPJxuA-KswF-Uqn3PMmVsAoUtw&oe=68897594&_nc_sid=22de04',
         icon: '🔬',
         title: 'Microagulhamento com Enzimas',
         duration: 'Tempo médio: 50min',
