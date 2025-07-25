@@ -1,48 +1,62 @@
 <template>
   <div class="salon-container">
     <!-- Menu Lateral Flutuante -->
-    <div class="salon-sidebar" :class="{ open: sidebarOpen }">
+    <div class="salon-sidebar" :class="{ open: isMobileMenuOpen }">
       <div class="salon-logo">RED Beauty</div>
       <nav>
         <ul class="salon-nav-menu">
-          <li v-for="item in menuItems" :key="item.id">
-            <a @click.prevent="scrollToSection(item.id)" href="#">{{ item.label }}</a>
+          <li v-for="section in menuSections" :key="section.id">
+            <a @click="scrollToSection(section.id)" href="#">{{ section.name }}</a>
           </li>
         </ul>
       </nav>
     </div>
 
     <!-- Botão Menu Mobile -->
-    <button class="salon-menu-toggle" @click="toggleSidebar">☰</button>
+    <button class="salon-menu-toggle" @click="toggleMobileMenu">☰</button>
 
     <!-- Hero Section -->
     <div class="salon-hero">
       <div class="salon-hero-content">
         <h1>Transforme sua Beleza</h1>
         <p>Descubra nossos serviços exclusivos e viva uma experiência única de cuidado e bem-estar</p>
-        <button class="salon-cta-button" @click="scrollToSection('salon-cabelo')">Conheça Nossos Serviços</button>
+        <a @click="scrollToSection('salon-cabelo')" href="#" class="salon-cta-button">Conheça Nossos Serviços</a>
       </div>
     </div>
 
     <!-- Seções de Serviços -->
-    <div v-for="section in sections" :key="section.id" :id="section.id" class="salon-section">
-      <h2 class="salon-section-title" :class="{ animate: animatedSections.includes(section.id) }">{{ section.title }}</h2>
+    <div
+        v-for="section in serviceSections"
+        :key="section.id"
+        :id="section.id"
+        class="salon-section"
+        :class="section.class"
+    >
+      <h2 class="salon-section-title" :class="{ animate: visibleSections.includes(section.id) }">
+        {{ section.icon }} {{ section.title }}
+      </h2>
       <div class="salon-services-grid">
         <div
             v-for="(service, index) in section.services"
             :key="index"
-            class="salon-service-card salon-floating"
-            :class="{ animate: animatedSections.includes(section.id) }"
+            class="salon-service-card"
+            :class="{ animate: visibleSections.includes(section.id), 'salon-floating': section.id === 'salon-cabelo' }"
             :style="{ transitionDelay: `${index * 0.1}s` }"
         >
-          <img :src="service.image" class="salon-service-image">
+          <img
+              v-if="service.image"
+              :src="service.image"
+              :alt="service.title"
+              class="salon-service-image"
+          >
           <div class="salon-service-icon">{{ service.icon }}</div>
-          <h3>{{ service.name }}</h3>
+          <h3>{{ service.title }}</h3>
           <div class="salon-service-duration">⏱️ {{ service.duration }}</div>
           <p>{{ service.description }}</p>
           <ul v-if="service.benefits" class="salon-benefits">
-            <li v-for="(benefit, bIdx) in service.benefits" :key="bIdx">{{ benefit }}</li>
+            <li v-for="benefit in service.benefits" :key="benefit">{{ benefit }}</li>
           </ul>
+          <p v-if="service.quote"><em>{{ service.quote }}</em></p>
         </div>
       </div>
     </div>
@@ -50,519 +64,614 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue'
 
-const sidebarOpen = ref(false);
-const menuItems = [
-  { id: 'salon-cabelo', label: 'Cabelo' },
-  { id: 'salon-unhas', label: 'Unhas & Cílios' },
-  { id: 'salon-sobrancelhas', label: 'Sobrancelhas' },
-  { id: 'salon-facial', label: 'Facial' },
-  { id: 'salon-corporal', label: 'Corporal' },
-  { id: 'salon-depilacao', label: 'Depilação' },
-  { id: 'salon-especiais', label: 'Especiais' },
-];
+// Estados reativos
+const isMobileMenuOpen = ref(false)
+const visibleSections = ref([])
 
-const sections = [
+// Menu de navegação
+const menuSections = [
+  { id: 'salon-cabelo', name: 'Cabelo' },
+  { id: 'salon-unhas', name: 'Unhas & Cílios' },
+  { id: 'salon-sobrancelhas', name: 'Sobrancelhas' },
+  { id: 'salon-facial', name: 'Facial' },
+  { id: 'salon-corporal', name: 'Corporal' },
+  { id: 'salon-depilacao', name: 'Depilação' },
+  { id: 'salon-especiais', name: 'Especiais' }
+]
+
+// Dados dos serviços
+const serviceSections = [
   {
     id: 'salon-cabelo',
-    title: '💇‍♀️ Cabelo & Tratamentos Capilares',
+    class: 'salon-cabelo',
+    icon: '💇‍♀️',
+    title: 'Cabelo & Tratamentos Capilares',
     services: [
       {
-        name: 'Corte Personalizado',
-        image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df',
+        image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
         icon: '✂️',
-        duration: '40min',
-        description: 'Transforme seu visual com cortes modernos e precisos. Inclui lavagem e secagem.',
+        title: 'Corte Personalizado',
+        duration: 'Tempo médio: 40min',
+        description: 'Transforme seu visual com cortes modernos e precisos, elaborados para valorizar seu formato de rosto e estilo de vida. Inclui lavagem e secagem.'
       },
       {
-        name: 'Mechas & Morena Iluminada',
-        image: 'https://images.unsplash.com/photo-1600965965803-73d6f7658b96',
-        icon: '🌞',
-        duration: '4-6h',
-        description: 'Técnica de luzimento estratégico para cabelos castanhos.',
+        image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        icon: '✨',
+        title: 'Mechas & Morena Iluminada',
+        duration: 'Tempo médio: 4-6 horas',
+        description: 'Técnica de luzimento estratégico para cabelos castanhos, utilizando balayage ou baby lights para criar reflexos naturais sem contraste marcado.',
         benefits: [
           'Ilumina o rosto sem danificar toda a estrutura capilar',
           'Efeito "férias na praia" com manutenção prática',
-          'Baixo contraste para crescimento discreto das raízes',
+          'Baixo contraste para crescimento discreto das raízes'
         ],
+        quote: '"Seus fios ganham luz natural e movimento cinematográfico!"'
       },
-    ],
+      {
+        image: 'https://images.unsplash.com/photo-1605497788044-5a32c7078486?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        icon: '💫',
+        title: 'Progressiva & Alisamentos',
+        duration: 'Tempo médio: 3h',
+        description: 'Alise com saúde! Utilizamos fórmulas modernas (sem formol ou com baixo dano) que alinham os fios, reduzem volume e proporcionam brilho intenso, respeitando a integridade do seu cabelo.'
+      }
+    ]
   },
   {
     id: 'salon-unhas',
-    title: '💅 Unhas & Cílios',
+    class: 'salon-unhas',
+    icon: '💅',
+    title: 'Unhas & Cílios',
     services: [
       {
-        name: 'Manicure e Pedicure',
-        image: 'https://images.unsplash.com/photo-1587502536263-9298f9f1903b',
+        image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
         icon: '💅',
-        duration: '1h',
-        description: 'Cuidado completo com unhas das mãos e dos pés, com acabamento impecável.',
+        title: 'Manicure & Pedicure Premium',
+        duration: 'Tempo médio: 1h50min',
+        description: 'Mãos e pés impecáveis! Corte, lixamento, tratamento de cutículas, hidratação, esfoliação e esmaltação (comum ou em gel) com higiene absoluta e produtos esterilizados em autoclave.'
       },
       {
-        name: 'Alongamento de Unhas em Gel',
-        image: 'https://images.unsplash.com/photo-1620925481218-6b62e89f5122',
+        image: 'https://images.unsplash.com/photo-1610992015732-2199de8dce7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
         icon: '💎',
-        duration: '2h',
-        description: 'Unhas mais longas e resistentes com aspecto natural.',
+        title: 'Extensão de Unhas',
+        duration: 'Tempo médio: 2h30min',
+        description: 'Unhas longas, resistentes e perfeitas! Alongamento personalizado com gel ou fibra para um visual elegante e duradouro.'
       },
       {
-        name: 'Extensão de Cílios',
-        image: 'https://images.unsplash.com/photo-1616486701049-1d9024c6c06d',
+        image: 'https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
         icon: '👁️',
-        duration: '1h30min',
-        description: 'Volume e definição para os olhos com técnicas fio a fio ou volume russo.',
-      },
-    ],
+        title: 'Extensão de Cílios Fio a Fio',
+        duration: 'Tempo médio: 2h-2h30min',
+        description: 'Olhar impactante 24h por dia! Aplicação de fios sintéticos ou de seda cílio a cílio, com efeito natural ou dramático, sem necessidade de máscara de cílios.'
+      }
+    ]
   },
   {
     id: 'salon-sobrancelhas',
-    title: '👁️‍🗨️ Sobrancelhas',
+    class: 'salon-sobrancelhas',
+    icon: '🎨',
+    title: 'Sobrancelhas & Maquiagem',
     services: [
       {
-        name: 'Design de Sobrancelhas',
-        image: 'https://images.unsplash.com/photo-1630055303521-694f0a03f2e0',
-        icon: '🖌️',
-        duration: '40min',
-        description: 'Harmonização do olhar com técnicas de medição e simetria facial.',
+        image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        icon: '✏️',
+        title: 'Design de Sobrancelhas',
+        duration: '20min simples / 40min com henna',
+        description: 'Designer personalizado para valorizar seu olhar! Formato perfeito + cor intensa! Definimos seu arco ideal e preenchemos falhas com pigmentação temporária (henna). Usamos técnicas de cera & pinça.'
       },
       {
-        name: 'Henna',
-        image: 'https://images.unsplash.com/photo-1588776814546-21831e7a3be4',
-        icon: '🎨',
-        duration: '30min',
-        description: 'Preenchimento natural temporário com efeito de sombra nas sobrancelhas.',
+        image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        icon: '💄',
+        title: 'Maquiagem Profissional & Penteados',
+        duration: 'Makeup: 1h / Penteado: 1h30min',
+        description: 'Brilhe em qualquer ocasião! Maquiagem e penteados elegantes (coques, ondas, tranças) personalizados para eventos, noivas ou dia a dia.'
       },
-    ],
+      {
+        image: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=80',
+        icon: '🖋️',
+        title: 'Micro Pigmentação',
+        duration: 'Tempo médio: 1h30min',
+        description: 'Correção semipermanente! Técnica de micropigmentação para realçar lábios com efeito blush ou reconstruir sobrancelhas com traços naturais e simétricos.'
+      }
+    ]
   },
   {
     id: 'salon-facial',
-    title: '🌸 Estética Facial',
+    class: 'salon-facial',
+    icon: '🌸',
+    title: 'Estética Facial',
     services: [
       {
-        name: 'Limpeza de Pele Profunda',
-        image: 'https://images.unsplash.com/photo-1617339769364-7b4990ee3f6f',
-        icon: '🧖‍♀️',
-        duration: '1h30min',
-        description: 'Remoção de impurezas, cravos e renovação celular com hidratação.',
+        icon: '🧴',
+        title: 'Limpeza de Pele Profunda',
+        duration: 'Tempo médio: 50min',
+        description: 'Desintoxicação e renovação! Higienização profunda com extração de impurezas, esfoliação, máscaras e hidratação para pele radiante e livre de cravos.'
       },
       {
-        name: 'Peeling de Diamante',
-        image: 'https://images.unsplash.com/photo-1594824476967-48c3b1f3d6e3',
-        icon: '💎',
-        duration: '50min',
-        description: 'Esfoliação profunda que melhora textura e luminosidade da pele.',
+        icon: '🔬',
+        title: 'Microagulhamento com Enzimas',
+        duration: 'Tempo médio: 50min',
+        description: 'Rejuvenescimento com precisão! Agulhas microscópicas estimulam colágeno, enquanto enzimas ou ativos personalizados clareiam manchas, reduzem poros e tratam acne.'
       },
-    ],
+      {
+        icon: '✨',
+        title: 'Dermaplaning',
+        duration: 'Tempo médio: 45min',
+        description: 'Pele lisa, radiante e renovada! Procedimento com lâmina cirúrgica que remove pelos finos e células mortas, proporcionando textura aveludada e brilho imediato.',
+        benefits: [
+          'Pele instantaneamente lisa',
+          'Brilho imediato',
+          'Melhor absorção de produtos (até 70%)',
+          'Maquiagem impecável'
+        ]
+      },
+      {
+        icon: '💉',
+        title: 'Preenchimento Facial',
+        duration: 'Consulte durações',
+        description: 'Contorno jovem e harmonioso! Aplicação de ácido hialurônico para suavizar rugas, definir ângulos e restaurar volume facial com resultados naturais.'
+      }
+    ]
   },
   {
     id: 'salon-corporal',
-    title: '🧘‍♀️ Estética Corporal',
+    class: 'salon-corporal',
+    icon: '💪',
+    title: 'Estética Corporal',
     services: [
       {
-        name: 'Massagem Relaxante',
-        image: 'https://images.unsplash.com/photo-1612349317150-8df7de02aa39',
-        icon: '💆‍♀️',
-        duration: '1h',
-        description: 'Alívio do estresse e dores musculares com toques suaves e aromaterapia.',
+        icon: '🤲',
+        title: 'Liberação Miofascial',
+        duration: 'Consulte durações',
+        description: 'Alívio de tensões profundas! Técnica manual que libera aderências musculares e fasciais, melhorando mobilidade, reduzindo dores e promovendo bem-estar.'
       },
       {
-        name: 'Drenagem Linfática',
-        image: 'https://images.unsplash.com/photo-1590080876823-3c8e4320f6c0',
-        icon: '💧',
-        duration: '1h',
-        description: 'Redução de inchaços, retenção de líquidos e melhora da circulação.',
-      },
-    ],
+        icon: '🌿',
+        title: 'Tratamentos Corporais Personalizados',
+        duration: 'Varia conforme protocolo',
+        description: 'Combate à celulite, flacidez e gordura localizada! Protocolos com enzimas personalizadas para melhores resultados corporais.'
+      }
+    ]
   },
   {
     id: 'salon-depilacao',
-    title: '🪒 Depilação',
+    class: 'salon-depilacao',
+    icon: '🪒',
+    title: 'Depilação',
     services: [
       {
-        name: 'Depilação com Cera',
-        image: 'https://images.unsplash.com/photo-1605478902912-8e87a6c4b823',
-        icon: '🕯️',
-        duration: '30min - 1h',
-        description: 'Remoção eficaz dos pelos com menos agressão e mais durabilidade.',
+        icon: '⚡',
+        title: 'Depilação a Laser',
+        duration: 'Varia por área',
+        description: 'Fim dos pelos indesejados! Tecnologia avançada para depilação definitiva facial, corporal e capilar. Sessões seguras, rápidas e eficazes para todos os fototipos.'
       },
-    ],
+      {
+        icon: '🕯️',
+        title: 'Depilação com Cera',
+        duration: 'Varia por área',
+        description: 'Pele lisa e duradoura! Remoção de pelos com cera de alta aderência em axilas, pernas, virilha e outras áreas, seguida de hidratação calmante.'
+      }
+    ]
   },
   {
     id: 'salon-especiais',
-    title: '💖 Procedimentos Especiais',
+    class: 'salon-especiais',
+    icon: '⭐',
+    title: 'Tratamentos Especiais',
     services: [
       {
-        name: 'Dia da Noiva',
-        image: 'https://images.unsplash.com/photo-1583407730609-d3be0402c913',
-        icon: '👰',
-        duration: 'Pacote completo',
-        description: 'Experiência completa de beleza para o grande dia. Cabelo, maquiagem, cuidados e muito mais.',
+        icon: '🔆',
+        title: 'Lavieen Laser Multifuncional',
+        duration: 'Varia por área',
+        description: 'Solução multifuncional! Tratamento com laser versátil para:',
+        benefits: [
+          'Facial: Clareamento de manchas, rejuvenescimento e tratamento de acne',
+          'Capilar: Combate à queda de cabelo e estímulo de crescimento',
+          'Corporal: Manchas, foliculite, clareamento, combate à flacidez'
+        ]
       },
-    ],
-  },
-];
+      {
+        icon: '🎯',
+        title: 'Despigmentação de Micropigmentação',
+        duration: 'Varia conforme caso',
+        description: 'Correção de procedimentos antigos! Remoção segura de pigmentos indesejados em sobrancelhas ou lábios com tecnologia a laser.'
+      }
+    ]
+  }
+]
 
-const animatedSections = ref([]);
+// Métodos
+const toggleMobileMenu = () => {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
+}
+
+const scrollToSection = (sectionId) => {
+  const element = document.getElementById(sectionId)
+  if (element) {
+    element.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }
+  // Fechar menu mobile após clicar
+  if (window.innerWidth <= 768) {
+    isMobileMenuOpen.value = false
+  }
+}
 
 const animateOnScroll = () => {
-  sections.forEach(({ id }) => {
-    const el = document.getElementById(id);
-    if (el && el.getBoundingClientRect().top < window.innerHeight - 150 && !animatedSections.value.includes(id)) {
-      animatedSections.value.push(id);
+  const elements = document.querySelectorAll('.salon-section-title, .salon-service-card')
+
+  elements.forEach(element => {
+    const elementTop = element.getBoundingClientRect().top
+    const elementVisible = 150
+
+    if (elementTop < window.innerHeight - elementVisible) {
+      element.classList.add('animate')
+
+      // Adicionar seção à lista de visíveis
+      const section = element.closest('.salon-section')
+      if (section && !visibleSections.value.includes(section.id)) {
+        visibleSections.value.push(section.id)
+      }
     }
-  });
-};
+  })
+}
 
-const scrollToSection = (id) => {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  sidebarOpen.value = false;
-};
+const handleClickOutside = (event) => {
+  const sidebar = document.querySelector('.salon-sidebar')
+  const menuToggle = document.querySelector('.salon-menu-toggle')
 
-const toggleSidebar = () => {
-  sidebarOpen.value = !sidebarOpen.value;
-};
+  if (window.innerWidth <= 768 &&
+      !sidebar?.contains(event.target) &&
+      !menuToggle?.contains(event.target)) {
+    isMobileMenuOpen.value = false
+  }
+}
 
+// Lifecycle hooks
 onMounted(() => {
-  window.addEventListener('scroll', animateOnScroll);
-  animateOnScroll();
-});
+  window.addEventListener('scroll', animateOnScroll)
+  document.addEventListener('click', handleClickOutside)
+  animateOnScroll() // Executar uma vez ao montar
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', animateOnScroll)
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>
-/*serviços*/
 .salon-container * {
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .salon-container {
-  font-family: 'Arial', sans-serif !important;
-  line-height: 1.6 !important;
-  color: #333 !important;
-  overflow-x: hidden !important;
-  background: #f8f9fa !important;
-  margin-left: 120px !important; /* Espaço para o menu lateral */
-  padding-right: 20px !important;
+  font-family: 'Arial', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  overflow-x: hidden;
+  background: #f8f9fa;
+  margin-left: 120px;
+  padding-right: 20px;
 }
 
 /* Menu Lateral Flutuante */
 .salon-sidebar {
-  position: fixed !important;
-  left: 20px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  z-index: 1000 !important;
-  background: rgba(0, 0, 0, 0.9) !important;
-  backdrop-filter: blur(15px) !important;
-  border-radius: 25px !important;
-  padding: 2rem 1rem !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
-  border: 1px solid rgba(255, 64, 129, 0.2) !important;
-  transition: all 0.3s ease !important;
+  position: fixed;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 25px;
+  padding: 2rem 1rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 64, 129, 0.2);
+  transition: all 0.3s ease;
 }
 
 .salon-sidebar:hover {
-  background: rgba(0, 0, 0, 0.95) !important;
-  box-shadow: 0 25px 80px rgba(255, 64, 129, 0.2) !important;
+  background: rgba(0, 0, 0, 0.95);
+  box-shadow: 0 25px 80px rgba(255, 64, 129, 0.2);
 }
 
 .salon-logo {
-  font-size: 1.5rem !important;
-  font-weight: bold !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-  text-align: center !important;
-  margin-bottom: 2rem !important;
-  writing-mode: vertical-rl !important;
-  text-orientation: mixed !important;
+  font-size: 1.5rem;
+  font-weight: bold;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-align: center;
+  margin-bottom: 2rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
 }
 
 .salon-nav-menu {
-  list-style: none !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1rem !important;
-  align-items: center !important;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
 }
 
 .salon-nav-menu li {
-  width: 100% !important;
+  width: 100%;
 }
 
 .salon-nav-menu a {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-decoration: none !important;
-  color: white !important;
-  font-weight: 500 !important;
-  transition: all 0.3s ease !important;
-  padding: 1rem !important;
-  border-radius: 15px !important;
-  font-size: 0.9rem !important;
-  text-align: center !important;
-  min-height: 50px !important;
-  position: relative !important;
-  overflow: hidden !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  padding: 1rem;
+  border-radius: 15px;
+  font-size: 0.9rem;
+  text-align: center;
+  min-height: 50px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .salon-nav-menu a::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: -100% !important;
-  width: 100% !important;
-  height: 100% !important;
-  background: linear-gradient(90deg, transparent, rgba(255, 64, 129, 0.3), transparent) !important;
-  transition: left 0.5s ease !important;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 64, 129, 0.3), transparent);
+  transition: left 0.5s ease;
 }
 
 .salon-nav-menu a:hover {
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  color: white !important;
-  transform: translateX(5px) !important;
-  box-shadow: 0 5px 20px rgba(255, 64, 129, 0.4) !important;
-  text-decoration: none !important;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  color: white;
+  transform: translateX(5px);
+  box-shadow: 0 5px 20px rgba(255, 64, 129, 0.4);
 }
 
 .salon-nav-menu a:hover::before {
-  left: 100% !important;
+  left: 100%;
 }
 
-/* Header simplificado apenas para o logo principal */
-.salon-header {
-  position: sticky !important;
-  top: 0 !important;
-  width: 100% !important;
-  background: rgba(0, 0, 0, 0.95) !important;
-  backdrop-filter: blur(10px) !important;
-  z-index: 999 !important;
-  padding: 1rem 0 !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 2px 20px rgba(0,0,0,0.3) !important;
-  margin-bottom: 2rem !important;
-  display: none !important; /* Esconder header, usar apenas sidebar */
+.salon-menu-toggle {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1001;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  box-shadow: 0 5px 20px rgba(255, 64, 129, 0.4);
 }
 
 /* Hero Section */
 .salon-hero {
-  background: linear-gradient(135deg, #000000 0%, #333333 100%) !important;
-  padding: 80px 20px !important;
-  text-align: center !important;
-  color: white !important;
-  margin-bottom: 3rem !important;
-  border-radius: 20px !important;
-  position: relative !important;
-  overflow: hidden !important;
+  background: linear-gradient(135deg, #000000 0%, #333333 100%);
+  padding: 80px 20px;
+  text-align: center;
+  color: white;
+  margin-bottom: 3rem;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
 .salon-hero::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background: linear-gradient(45deg, rgba(255, 64, 129, 0.1) 0%, rgba(233, 30, 99, 0.1) 100%) !important;
-  z-index: 1 !important;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255, 64, 129, 0.1) 0%, rgba(233, 30, 99, 0.1) 100%);
+  z-index: 1;
 }
 
 .salon-hero-content {
-  max-width: 800px !important;
-  margin: 0 auto !important;
-  position: relative !important;
-  z-index: 2 !important;
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
 }
 
 .salon-hero h1 {
-  font-size: 3rem !important;
-  margin-bottom: 1rem !important;
-  animation: fadeInUp 1s ease forwards !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: fadeInUp 1s ease forwards;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .salon-hero p {
-  font-size: 1.3rem !important;
-  margin-bottom: 2rem !important;
-  animation: fadeInUp 1s ease 0.3s forwards !important;
+  font-size: 1.3rem;
+  margin-bottom: 2rem;
+  animation: fadeInUp 1s ease 0.3s forwards;
 }
 
 .salon-cta-button {
-  display: inline-block !important;
-  padding: 15px 40px !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  color: white !important;
-  text-decoration: none !important;
-  border-radius: 50px !important;
-  font-weight: bold !important;
-  transition: all 0.3s ease !important;
-  animation: fadeInUp 1s ease 0.6s forwards !important;
-  box-shadow: 0 10px 30px rgba(255, 64, 129, 0.4) !important;
+  display: inline-block;
+  padding: 15px 40px;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  animation: fadeInUp 1s ease 0.6s forwards;
+  box-shadow: 0 10px 30px rgba(255, 64, 129, 0.4);
+  cursor: pointer;
 }
 
 .salon-cta-button:hover {
-  transform: translateY(-3px) !important;
-  box-shadow: 0 15px 40px rgba(255, 64, 129, 0.6) !important;
-  color: white !important;
-  text-decoration: none !important;
+  transform: translateY(-3px);
+  box-shadow: 0 15px 40px rgba(255, 64, 129, 0.6);
+  color: white;
+  text-decoration: none;
 }
 
 /* Seções de Serviços */
 .salon-section {
-  padding: 60px 20px !important;
-  margin-bottom: 2rem !important;
-  border-radius: 20px !important;
-  position: relative !important;
-  background: white !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1) !important;
+  padding: 60px 20px;
+  margin-bottom: 2rem;
+  border-radius: 20px;
+  position: relative;
+  background: white;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
 }
 
 .salon-section-title {
-  text-align: center !important;
-  font-size: 2.5rem !important;
-  margin-bottom: 3rem !important;
-  color: #333 !important;
-  opacity: 0 !important;
-  transform: translateY(30px) !important;
-  transition: all 0.6s ease !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
+  text-align: center;
+  font-size: 2.5rem;
+  margin-bottom: 3rem;
+  color: #333;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s ease;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .salon-section-title.animate {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .salon-services-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)) !important;
-  gap: 2rem !important;
-  max-width: 1200px !important;
-  margin: 0 auto !important;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .salon-service-card {
-  background: white !important;
-  border-radius: 20px !important;
-  padding: 2rem !important;
-  border: 2px solid #f5f5f5 !important;
-  transition: all 0.4s ease !important;
-  opacity: 0 !important;
-  transform: translateY(50px) !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
-  position: relative !important;
-  overflow: hidden !important;
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  border: 2px solid #f5f5f5;
+  transition: all 0.4s ease;
+  opacity: 0;
+  transform: translateY(50px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
 }
 
 .salon-service-card::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
 }
 
 .salon-service-card.animate {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .salon-service-card:hover {
-  transform: translateY(-10px) !important;
-  box-shadow: 0 20px 60px rgba(255, 64, 129, 0.2) !important;
-  border-color: #ff4081 !important;
+  transform: translateY(-10px);
+  box-shadow: 0 20px 60px rgba(255, 64, 129, 0.2);
+  border-color: #ff4081;
 }
 
 .salon-service-image {
-  width: 100% !important;
-  height: 200px !important;
-  object-fit: cover !important;
-  border-radius: 15px !important;
-  margin-bottom: 1.5rem !important;
-  transition: transform 0.3s ease !important;
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 15px;
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s ease;
 }
 
 .salon-service-card:hover .salon-service-image {
-  transform: scale(1.05) !important;
+  transform: scale(1.05);
 }
 
 .salon-service-icon {
-  width: 60px !important;
-  height: 60px !important;
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  margin-bottom: 1rem !important;
-  font-size: 1.5rem !important;
-  position: absolute !important;
-  top: 1rem !important;
-  right: 1rem !important;
-  z-index: 2 !important;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
 }
 
 .salon-service-card h3 {
-  color: #333 !important;
-  font-size: 1.5rem !important;
-  margin-bottom: 1rem !important;
-  font-weight: 600 !important;
+  color: #333;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
 }
 
 .salon-service-card p {
-  color: #666 !important;
-  margin-bottom: 1rem !important;
-  line-height: 1.6 !important;
+  color: #666;
+  margin-bottom: 1rem;
+  line-height: 1.6;
 }
 
 .salon-service-duration {
-  background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-  color: white !important;
-  padding: 0.5rem 1rem !important;
-  border-radius: 20px !important;
-  font-size: 0.9rem !important;
-  display: inline-block !important;
-  margin-bottom: 1rem !important;
-  font-weight: 500 !important;
+  background: linear-gradient(45deg, #ff4081, #e91e63);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-weight: 500;
 }
 
 .salon-benefits {
-  list-style: none !important;
-  margin: 1rem 0 !important;
+  list-style: none;
+  margin: 1rem 0;
 }
 
 .salon-benefits li {
-  color: #666 !important;
-  margin: 0.5rem 0 !important;
-  padding-left: 1.5rem !important;
-  position: relative !important;
+  color: #666;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  position: relative;
 }
 
 .salon-benefits li::before {
-  content: '✨' !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  color: #ff4081 !important;
-}
-
-/* Remover backgrounds diferentes - usar apenas cards brancos */
-.salon-cabelo, .salon-unhas, .salon-sobrancelhas, .salon-facial,
-.salon-corporal, .salon-depilacao, .salon-especiais {
-  background: white !important;
+  content: '✨';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #ff4081;
 }
 
 /* Animações */
@@ -583,76 +692,58 @@ onMounted(() => {
 }
 
 .salon-floating {
-  animation: float 3s ease-in-out infinite !important;
+  animation: float 3s ease-in-out infinite;
 }
 
 /* Mobile Responsivo */
 @media (max-width: 768px) {
   .salon-container {
-    margin-left: 0 !important;
-    padding: 0 10px !important;
+    margin-left: 0;
+    padding: 0 10px;
   }
 
   .salon-sidebar {
-    position: fixed !important;
-    left: -200px !important;
-    top: 0 !important;
-    transform: none !important;
-    height: 100vh !important;
-    width: 200px !important;
-    border-radius: 0 !important;
-    border-top-right-radius: 20px !important;
-    border-bottom-right-radius: 20px !important;
-    transition: left 0.3s ease !important;
-    padding: 2rem 1rem !important;
+    position: fixed;
+    left: -200px;
+    top: 0;
+    transform: none;
+    height: 100vh;
+    width: 200px;
+    border-radius: 0;
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+    transition: left 0.3s ease;
+    padding: 2rem 1rem;
   }
 
   .salon-sidebar.open {
-    left: 0 !important;
+    left: 0;
   }
 
   .salon-menu-toggle {
-    display: block !important;
-    position: fixed !important;
-    top: 20px !important;
-    left: 20px !important;
-    z-index: 1001 !important;
-    background: linear-gradient(45deg, #ff4081, #e91e63) !important;
-    border: none !important;
-    border-radius: 50% !important;
-    width: 50px !important;
-    height: 50px !important;
-    color: white !important;
-    font-size: 1.2rem !important;
-    cursor: pointer !important;
-    box-shadow: 0 5px 20px rgba(255, 64, 129, 0.4) !important;
+    display: block;
   }
 
   .salon-logo {
-    writing-mode: horizontal-tb !important;
-    text-orientation: mixed !important;
-    font-size: 1.2rem !important;
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    font-size: 1.2rem;
   }
 
   .salon-hero h1 {
-    font-size: 2rem !important;
+    font-size: 2rem;
   }
 
   .salon-hero p {
-    font-size: 1rem !important;
+    font-size: 1rem;
   }
 
   .salon-section-title {
-    font-size: 1.8rem !important;
+    font-size: 1.8rem;
   }
 
   .salon-services-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
 }
-
-.salon-menu-toggle {
-  display: none !important;
-}
-
 </style>
