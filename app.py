@@ -1,8 +1,10 @@
 import os
 import time
+import math
+import mimetypes
+import argparse
 import requests
-from flask import Flask, jsonify, request, send_file, Response, send_from_directory, abort
-
+from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response
 from dotenv import load_dotenv
 from flask_cors import CORS
 
@@ -10,117 +12,319 @@ load_dotenv()
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-# ----------------------------- #
+# =========================
 # Config
-# ----------------------------- #
+# =========================
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
 GRAPH_API_URL = 'https://graph.instagram.com/v22.0'
-CACHE_DURATION_SECONDS = int(os.getenv('CACHE_DURATION_SECONDS', '300'))
 
+CACHE_DURATION_SECONDS = int(os.getenv('CACHE_DURATION_SECONDS', '3600'))  # posts (1h)
 PLACE_ID = os.getenv('GOOGLE_PLACE_ID')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
-# Cache simples em memória com TTL
-api_cache = {}  # key -> {"ts": epoch_seconds, "data": any}
+MEDIA_CACHE_DIR = os.getenv('MEDIA_CACHE_DIR', os.path.join(os.getcwd(), 'cache', 'instagram'))
+MEDIA_CACHE_TTL_SECONDS = int(os.getenv('MEDIA_CACHE_TTL_SECONDS', '3600'))  # mídias (1h)
+MEDIA_CACHE_MAX_BYTES = int(os.getenv('MEDIA_CACHE_MAX_BYTES', str(25 * 1024 * 1024)))  # 25MB
+WARMUP_TOKEN = os.getenv('WARMUP_TOKEN', '')
+WARMUP_SLEEP_SECONDS = float(os.getenv('WARMUP_SLEEP_SECONDS', '0.25'))
+
+os.makedirs(MEDIA_CACHE_DIR, exist_ok=True)
+
+# Cache simples com TTL (em memória) para respostas JSON
+api_cache = {}  # key -> {"data": ..., "ts": epoch}
 
 
-# ----------------------------- #
-# Cache helpers (com TTL)
-# ----------------------------- #
-
+# =========================
+# Utils de cache em memória
+# =========================
 def get_from_cache(key):
     item = api_cache.get(key)
     if not item:
         return None
-    ts = item.get("ts")
-    if ts is None or (time.time() - ts) > CACHE_DURATION_SECONDS:
-        # expirou
+    if (time.time() - item["ts"]) > CACHE_DURATION_SECONDS:
         api_cache.pop(key, None)
         return None
-    return item.get("data")
+    return item["data"]
 
 
 def set_in_cache(key, data):
-    api_cache[key] = {"ts": time.time(), "data": data}
+    api_cache[key] = {"data": data, "ts": time.time()}
 
 
-# ----------------------------- #
+# =========================
 # Instagram helpers
-# ----------------------------- #
-def ig_get(path_or_full_url, params):
-    """Wrapper para GET na Graph API do Instagram com token e timeout padronizados."""
-    if path_or_full_url.startswith("http"):
-        url = path_or_full_url
-    else:
-        url = f"{GRAPH_API_URL.rstrip('/')}/{path_or_full_url.lstrip('/')}"
-    base_params = {"access_token": ACCESS_TOKEN}
-    base_params.update(params or {})
-    r = requests.get(url, params=base_params, timeout=10)
+# =========================
+def ig_get(path_or_id: str, fields: str, extra: dict | None = None):
+    """GET na Graph API com token e timeout padrão; aceita params extras (ex.: limit, after)."""
+    url = f"{GRAPH_API_URL.rstrip('/')}/{path_or_id.lstrip('/')}"
+    params = {"fields": fields, "access_token": ACCESS_TOKEN}
+    if extra:
+        params.update(extra)
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def ig_get_url(full_url: str):
+    """GET em uma URL 'next' da Graph (já com token embutido)."""
+    r = requests.get(full_url, timeout=10)
     r.raise_for_status()
     return r.json()
 
 
 def fetch_user_profile():
-    """Busca e cacheia perfil do usuário; retorna payload formatado para o frontend."""
     cache_key = f"profile_{USER_ID}"
     cached = get_from_cache(cache_key)
     if cached:
         return cached
 
-    # Nota: Graph API /me retorna dados limitados para IG Business/Creator conectados.
-    params = {
-        "fields": "id,username,biography,followers_count,follows_count,media_count,account_type",
-    }
-    data = ig_get("me", params=params)
+    fields = "id,username,biography,followers_count,follows_count,media_count,account_type"
+    data = ig_get("me", fields)
 
     payload = {
         "username": data.get("username"),
-        # A foto de perfil muitas vezes não é retornada pela Graph API IG Business.
-        # Se quiser algo fixo, ajuste aqui:
-        "profilePictureUrl": None,
-        "fullName": None,  # "name" não é garantido para IG Business
-        "isVerified": True,  # se precisar, ajuste de acordo com sua lógica
+        "profilePictureUrl": None,  # Graph IG nem sempre fornece
+        "fullName": None,
+        "isVerified": True,  # ajuste conforme sua regra
         "biography": data.get("biography"),
         "postsCount": data.get("media_count"),
         "followersCount": data.get("followers_count"),
-        "followingCount": data.get("follows_count")
+        "followingCount": data.get("follows_count"),
     }
     set_in_cache(cache_key, payload)
     return payload
 
 
-def fetch_media_meta(media_id, fields="media_type,media_url,thumbnail_url,permalink"):
-    """Busca metadados de uma mídia pelo ID (gera URLs frescas)."""
-    return ig_get(media_id, params={"fields": fields})
+# =========================
+# Cache de mídia em DISCO (por media_id)
+# =========================
+def _ext_from_content_type(ct: str) -> str:
+    if not ct:
+        return ''
+    if 'jpeg' in ct:
+        return '.jpg'
+    if 'png' in ct:
+        return '.png'
+    if 'gif' in ct:
+        return '.gif'
+    if 'webp' in ct:
+        return '.webp'
+    if 'mp4' in ct:
+        return '.mp4'
+    if 'mpeg' in ct:
+        return '.mpg'
+    return mimetypes.guess_extension(ct) or ''
 
 
-# ----------------------------- #
+def _cache_paths(media_id: str, content_type: str = None):
+    """Retorna caminho do arquivo e do .meta (content-type)."""
+    for name in os.listdir(MEDIA_CACHE_DIR):
+        if name.startswith(media_id + "."):
+            p = os.path.join(MEDIA_CACHE_DIR, name)
+            meta = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
+            return p, meta
+    ext = _ext_from_content_type(content_type) if content_type else '.bin'
+    file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}{ext}")
+    meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
+    return file_path, meta_path
+
+
+def _write_meta(meta_path: str, content_type: str):
+    try:
+        with open(meta_path, 'w') as f:
+            f.write(content_type or 'application/octet-stream')
+    except Exception:
+        pass
+
+
+def _read_meta(meta_path: str) -> str:
+    try:
+        with open(meta_path, 'r') as f:
+            return f.read().strip()
+    except Exception:
+        return 'application/octet-stream'
+
+
+def _is_cache_fresh(file_path: str) -> bool:
+    if not os.path.exists(file_path):
+        return False
+    age = time.time() - os.path.getmtime(file_path)
+    return age <= MEDIA_CACHE_TTL_SECONDS
+
+
+def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int) -> str:
+    """Salva stream respeitando um limite de bytes. Retorna caminho usado (ou '' se abortar)."""
+    tmp_path = dst_path + ".tmp"
+    total = 0
+    with open(tmp_path, 'wb') as f:
+        for chunk in resp.iter_content(chunk_size=1024 * 64):
+            if chunk:
+                total += len(chunk)
+                if total > max_bytes:
+                    f.close()
+                    os.remove(tmp_path)
+                    return ''
+                f.write(chunk)
+    if os.path.exists(dst_path):
+        os.remove(dst_path)
+    os.rename(tmp_path, dst_path)
+    return dst_path
+
+
+def drop_media_cache(media_id: str):
+    """Remove arquivos de cache (mídia + meta) de um media_id."""
+    for name in os.listdir(MEDIA_CACHE_DIR):
+        if name.startswith(media_id + "."):
+            try:
+                os.remove(os.path.join(MEDIA_CACHE_DIR, name))
+            except Exception:
+                pass
+
+
+def ensure_media_cached(media_id: str) -> tuple[str, str]:
+    """
+    Garante mídia em cache; retorna (file_path, content_type).
+    Se arquivo fresco já existir, usa. Senão busca via Graph, baixa e salva.
+    Pode não salvar se exceder MEDIA_CACHE_MAX_BYTES; nesse caso retorna ('','').
+    """
+    existing_file, existing_meta = _cache_paths(media_id)
+    if os.path.exists(existing_file) and _is_cache_fresh(existing_file):
+        return existing_file, _read_meta(existing_meta)
+
+    info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
+    src = info.get("media_url") or info.get("thumbnail_url")
+    if not src:
+        return '', ''
+
+    with requests.get(src, stream=True, timeout=20) as cdn:
+        cdn.raise_for_status()
+        ct = cdn.headers.get('Content-Type', 'application/octet-stream')
+        file_path, meta_path = _cache_paths(media_id, ct)
+        saved_path = _save_stream_to_file(cdn, file_path, MEDIA_CACHE_MAX_BYTES)
+    if saved_path:
+        _write_meta(meta_path, ct)
+        os.utime(saved_path, None)
+        return saved_path, ct
+    return '', ''  # muito grande → não cacheado
+
+
+# =========================
+# Servir arquivo com suporte a Range (206)
+# =========================
+def serve_file_with_range(path: str, content_type: str):
+    file_size = os.path.getsize(path)
+    range_header = request.headers.get('Range', None)
+
+    if not range_header:
+        resp = make_response()
+        with open(path, 'rb') as f:
+            resp.data = f.read()
+        resp.headers['Content-Type'] = content_type
+        resp.headers['Content-Length'] = str(file_size)
+        resp.headers['Accept-Ranges'] = 'bytes'
+        return resp
+
+    try:
+        units, rng = range_header.split('=')
+        if units != 'bytes':
+            raise ValueError
+        start_str, end_str = rng.split('-')
+        start = int(start_str) if start_str else 0
+        end = int(end_str) if end_str else file_size - 1
+        end = min(end, file_size - 1)
+        if start > end or start < 0:
+            raise ValueError
+    except Exception:
+        return Response(status=416)
+
+    length = end - start + 1
+    with open(path, 'rb') as f:
+        f.seek(start)
+        chunk = f.read(length)
+
+    resp = Response(chunk, status=206, mimetype=content_type)
+    resp.headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
+    resp.headers['Accept-Ranges'] = 'bytes'
+    resp.headers['Content-Length'] = str(length)
+    return resp
+
+
+# =========================
 # Rotas Instagram
-# ----------------------------- #
+# =========================
 @app.route('/api/instagram/user_profile', methods=['GET'])
-def get_user_profile():
+def get_user_profile_route():
     try:
         profile = fetch_user_profile()
         return jsonify({"code": 200, "payload": profile, "message": ""})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/instagram/media_proxy', methods=['GET'])
+def media_proxy():
+    """
+    Proxy por media_id com cache em disco:
+    - se arquivo fresco existir → serve do arquivo (com Range)
+    - senão → baixa da CDN (via Graph), salva (se <= limite) e serve
+    Forçar refresh: /api/instagram/media_proxy?id=<id>&refresh=1
+    """
+    media_id = request.args.get('id')
+    if not media_id:
+        return Response('Missing id', status=400)
+
+    refresh = request.args.get('refresh') == '1'
+
+    try:
+        if not refresh:
+            file_path, ct = ensure_media_cached(media_id)
+            if file_path and os.path.exists(file_path):
+                return serve_file_with_range(file_path, ct)
+
+        # refresh forçado ou cache indisponível
+        info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
+        src = info.get("media_url") or info.get("thumbnail_url")
+        if not src:
+            return Response('No media_url available', status=502)
+
+        with requests.get(src, stream=True, timeout=20) as cdn:
+            cdn.raise_for_status()
+            ct = cdn.headers.get('Content-Type', 'application/octet-stream')
+            file_path, meta_path = _cache_paths(media_id, ct)
+            saved_path = _save_stream_to_file(cdn, file_path, MEDIA_CACHE_MAX_BYTES)
+
+        if saved_path:
+            _write_meta(meta_path, ct)
+            return serve_file_with_range(saved_path, ct)
+
+        # fallback sem cache (muito grande)
+        cdn2 = requests.get(src, stream=True, timeout=20)
+        cdn2.raise_for_status()
+        return Response(cdn2.iter_content(chunk_size=1024 * 64),
+                        content_type=ct,
+                        direct_passthrough=True)
+
+    except requests.exceptions.RequestException as e:
+        status = getattr(e.response, 'status_code', 500)
+        return Response(f'Error: {e}", status=status')
+    except Exception as e:
+        return Response(f'Error: {e}', status=500)
+
+
 @app.route('/api/instagram/posts', methods=['GET'])
 def get_user_posts():
     """
-    Retorna a lista de posts, mas ***sem*** URLs de mídia expiráveis.
-    Em vez disso, devolve IDs (do post e dos filhos do carrossel).
-    O front deve buscar a URL fresca via:
-      - /api/instagram/media_proxy?id=<MEDIA_ID>  (recomendado)
-      - ou /api/instagram/media_url?id=<MEDIA_ID>
+    Retorna posts mantendo a estrutura antiga de media_items,
+    mas substitui as URLs da CDN por URLs do backend:
+      /api/instagram/media_proxy?id=<media_id>
     """
     username = request.args.get('username', 'me')
     cache_key = f"posts_{username}"
-    cached_data = get_from_cache(cache_key)
-    if cached_data:
+    cached = get_from_cache(cache_key)
+    if cached:
         print(f"Servindo posts de '{username}' do cache (TTL {CACHE_DURATION_SECONDS}s)")
-        return jsonify(cached_data)
+        return jsonify(cached)
 
     if not ACCESS_TOKEN:
         return jsonify({"error": "Access Token não configurado no backend"}), 500
@@ -130,16 +334,12 @@ def get_user_posts():
     except Exception as e:
         return jsonify({"error": "Falha ao buscar perfil: " + str(e)}), 500
 
-    posts_endpoint = f"{USER_ID}/media"
-    params = {
-        # Importante: pedimos children{id,media_type} apenas; não pedimos media_url para não guardar coisa que expira
-        "fields": "id,caption,media_type,permalink,timestamp,username,children{id,media_type},comments_count,like_count",
-        "limit": 20
-    }
-
+    fields = "id,caption,media_type,permalink,timestamp,username,children{id,media_type},comments_count,like_count"
     try:
-        api_data = ig_get(posts_endpoint, params=params)
+        api_data = ig_get(f"{USER_ID}/media", fields)
         formatted_posts = []
+
+        width, height = 1080.0, 1920.0
 
         for post in api_data.get("data", []):
             author = {
@@ -154,31 +354,47 @@ def get_user_posts():
                 "followingCount": user_info.get("followingCount")
             }
 
+            def make_cover(mid: str):
+                return {
+                    "thumbnail": {
+                        "url": f"/api/instagram/media_proxy?id={mid}",
+                        "width": width,
+                        "height": height
+                    },
+                    "standard": None,
+                    "original": None
+                }
+
             media_items = []
             ptype = (post.get("media_type") or "").upper()
 
             if ptype in ("IMAGE", "VIDEO"):
+                mid = post.get("id")
                 media_items.append({
-                    "type": ptype.lower(),  # "image" | "video"
-                    "id": post.get("id")    # o próprio post é a mídia
+                    "type": ptype.lower(),
+                    "url": f"/api/instagram/media_proxy?id={mid}",
+                    "cover": make_cover(mid),
+                    "id": mid
                 })
-
             elif ptype == "CAROUSEL_ALBUM":
                 children = (post.get("children") or {}).get("data", [])
                 for child in children:
-                    ctype = (child.get("media_type") or "").lower()
+                    ctype = (child.get("media_type") or "").upper()
+                    mid = child.get("id")
                     media_items.append({
-                        "type": ctype,       # "image" | "video"
-                        "id": child.get("id")
+                        "type": ctype.lower(),
+                        "url": f"/api/instagram/media_proxy?id={mid}",
+                        "cover": make_cover(mid),
+                        "id": mid
                     })
 
             formatted_post = {
                 "vendorId": post.get("id"),
-                "type": ptype.lower().replace("_album", ""),
+                "type": (post.get("media_type") or "").lower().replace("_album", ""),
                 "link": post.get("permalink"),
                 "publishedAt": post.get("timestamp"),
                 "author": author,
-                "media": media_items,   # << só IDs; sem URLs que expiram
+                "media": media_items,
                 "comments": [],
                 "caption": post.get("caption"),
                 "commentsCount": post.get("comments_count", 0),
@@ -204,69 +420,103 @@ def get_user_posts():
         return jsonify(error_payload), getattr(e.response, 'status_code', 500)
 
 
-@app.route('/api/instagram/media_url', methods=['GET'])
-def get_media_url():
-    """
-    Dado um media_id, retorna media_url/thumbnail_url Frescos.
-    Uso: GET /api/instagram/media_url?id=<MEDIA_ID>
-    """
-    media_id = request.args.get('id')
-    if not media_id:
-        return jsonify({"error": "Parâmetro 'id' é obrigatório"}), 400
+# =========================
+# WARM-UP (endpoint + helpers)
+# =========================
+def collect_media_ids(limit_posts: int = 20) -> list[str]:
+    """Coleta media_ids dos últimos posts (inclui filhos de carrossel) até atingir limit_posts."""
+    ids: list[str] = []
+    got_posts = 0
+    fields = "id,media_type,children{id,media_type}"
+    url = f"{GRAPH_API_URL}/{USER_ID}/media?fields={fields}&limit=25&access_token={ACCESS_TOKEN}"
 
     try:
-        info = fetch_media_meta(media_id, fields="media_type,media_url,thumbnail_url,permalink")
-        return jsonify({
-            "code": 200,
-            "payload": {
-                "media_type": info.get("media_type"),
-                "media_url": info.get("media_url"),
-                "thumbnail_url": info.get("thumbnail_url"),
-                "permalink": info.get("permalink")
-            }
-        })
-    except requests.exceptions.RequestException as e:
-        status = getattr(e.response, 'status_code', 500)
-        return jsonify({"error": str(e)}), status
+        while url and got_posts < limit_posts:
+            data = ig_get_url(url)
+            for post in data.get("data", []):
+                if got_posts >= limit_posts:
+                    break
+                ptype = (post.get("media_type") or "").upper()
+                if ptype in ("IMAGE", "VIDEO"):
+                    ids.append(post.get("id"))
+                elif ptype == "CAROUSEL_ALBUM":
+                    for child in (post.get("children") or {}).get("data", []):
+                        ids.append(child.get("id"))
+                got_posts += 1
+
+            url = (data.get("paging") or {}).get("next")
+    except requests.exceptions.RequestException:
+        pass
+
+    # Dedup
+    seen = set()
+    unique_ids = []
+    for mid in ids:
+        if mid and mid not in seen:
+            seen.add(mid)
+            unique_ids.append(mid)
+    return unique_ids
 
 
-@app.route('/api/instagram/media_proxy', methods=['GET'])
-def media_proxy():
-    """
-    Proxy que aceita um media_id e entrega o binário da mídia com URL sempre válida.
-    Uso: <img src="/api/instagram/media_proxy?id=<MEDIA_ID>">
-    """
-    media_id = request.args.get('id')
-    if not media_id:
-        return Response('Missing id', status=400)
+def warmup(limit_posts: int = 20, force: bool = False) -> dict:
+    mids = collect_media_ids(limit_posts)
+    ok, skipped, failed = 0, 0, 0
+    details = []
+
+    for mid in mids:
+        try:
+            if force:
+                drop_media_cache(mid)
+            file_path, ct = ensure_media_cached(mid)
+            if file_path:
+                ok += 1
+                details.append({"id": mid, "status": "cached", "path": file_path})
+            else:
+                skipped += 1
+                details.append({"id": mid, "status": "skipped"})
+        except Exception as e:
+            failed += 1
+            details.append({"id": mid, "status": "failed", "error": str(e)})
+        time.sleep(WARMUP_SLEEP_SECONDS)
+
+    return {"posts_scanned": limit_posts, "media_found": len(mids), "cached": ok, "skipped": skipped, "failed": failed, "details": details}
+
+
+def _is_local_request() -> bool:
+    # Atrás do Nginx, prefira token; mas se não houver token, permita apenas localhost
+    remote = request.headers.get('X-Forwarded-For', request.remote_addr) or ''
+    return remote.startswith('127.0.0.1') or remote.startswith('::1')
+
+
+@app.route('/api/instagram/warmup', methods=['POST'])
+def warmup_route():
+    token = request.headers.get('X-Warmup-Token') or request.args.get('token', '')
+    if WARMUP_TOKEN:
+        if token != WARMUP_TOKEN:
+            return jsonify({"error": "unauthorized"}), 401
+    else:
+        if not _is_local_request():
+            return jsonify({"error": "forbidden"}), 403
 
     try:
-        info = fetch_media_meta(media_id, fields="media_type,media_url,thumbnail_url")
-        src = info.get("media_url") or info.get("thumbnail_url")
-        if not src:
-            return Response('No media_url available', status=502)
+        limit_posts = int(request.args.get('limit', '20'))
+        force = request.args.get('force') == '1' or request.json.get('force') if request.is_json else False
+    except Exception:
+        limit_posts = 20
+        force = False
 
-        cdn = requests.get(src, stream=True, timeout=10)
-        cdn.raise_for_status()
-        content_type = cdn.headers.get('Content-Type', 'application/octet-stream')
-        return Response(cdn.content, content_type=content_type)
-    except requests.exceptions.RequestException as e:
-        status = getattr(e.response, 'status_code', 500)
-        return Response(f'Error: {e}', status=status)
-    except Exception as e:
-        return Response(f'Error: {e}', status=500)
+    result = warmup(limit_posts=limit_posts, force=bool(force))
+    return jsonify({"code": 200, "payload": result})
 
 
+# =========================
+# Legacy proxy por URL direta (se ainda usar em algum lugar)
+# =========================
 @app.route('/api/instagram/proxy-image', methods=['GET'])
 def proxy_image_legacy():
-    """
-    LEGADO: proxy por URL direta (ainda funciona, mas a URL pode expirar).
-    Prefira /api/instagram/media_proxy?id=...
-    """
     url = request.args.get('url')
     if not url:
         return Response('Missing URL', status=400)
-    # Segurança simples: só permitir domínios instagram/scontent
     if not (url.startswith('https://scontent') or url.startswith('https://instagram')):
         return Response('Blocked domain', status=403)
     try:
@@ -278,9 +528,9 @@ def proxy_image_legacy():
         return Response(f'Error: {e}', status=500)
 
 
-# ----------------------------- #
-# Google reviews
-# ----------------------------- #
+# =========================
+# Google Reviews
+# =========================
 @app.route('/api/google/reviews')
 def google_reviews():
     try:
@@ -307,9 +557,9 @@ def get_google_reviews():
         return []
 
 
-# ----------------------------- #
-# Static & util
-# ----------------------------- #
+# =========================
+# Static
+# =========================
 ALLOWED_EXTENSIONS = {'.json', '.js'}
 
 def allowed_file(filename):
@@ -330,22 +580,36 @@ def serve_static_instagram(filename):
     if not os.path.isfile(filepath):
         abort(404)
 
-    # Serve o arquivo correto com o mimetype apropriado
     ext = os.path.splitext(filename)[1]
     if ext == '.json':
         mimetype = 'application/json'
     elif ext == '.js':
         mimetype = 'application/javascript'
     else:
-        mimetype = 'application/octet-stream'  # fallback seguro
+        mimetype = 'application/octet-stream'
 
     with open(filepath, 'rb') as f:
         content = f.read()
     return Response(content, mimetype=mimetype)
 
 
-# ----------------------------- #
-# Main
-# ----------------------------- #
+# =========================
+# Main / CLI
+# =========================
+def cli_warmup(limit: int, force: bool):
+    result = warmup(limit_posts=limit, force=force)
+    print(f"WARMUP => posts_scanned={result['posts_scanned']} media_found={result['media_found']} cached={result['cached']} skipped={result['skipped']} failed={result['failed']}")
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=8080)
+    parser = argparse.ArgumentParser(description="API Instagram com cache e warm-up")
+    parser.add_argument('--warmup', action='store_true', help='Executa warm-up e sai')
+    parser.add_argument('--limit', type=int, default=20, help='Quantidade de posts para varrer no warm-up')
+    parser.add_argument('--force', action='store_true', help='Força recachear as mídias')
+    parser.add_argument('--port', type=int, default=8080, help='Porta do servidor Flask (dev)')
+    args = parser.parse_args()
+
+    if args.warmup:
+        cli_warmup(limit=args.limit, force=args.force)
+    else:
+        app.run(debug=True, port=args.port)
