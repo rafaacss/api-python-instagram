@@ -1,5 +1,6 @@
 import os
 import requests
+import logging
 from flask import Flask, jsonify, request, send_file, Response, send_from_directory
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -15,6 +16,8 @@ GRAPH_API_URL = 'https://graph.instagram.com/v22.0'
 CACHE_DURATION_SECONDS = 300
 PLACE_ID = os.getenv('GOOGLE_PLACE_ID')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+
+logging.basicConfig(level=logging.INFO, filename='api-instagram')
 
 def get_from_cache(key):
     return api_cache.get(key)
@@ -73,7 +76,12 @@ def proxy_image():
     if not url.startswith('https://scontent') and not url.startswith('https://instagram'):
         return Response('Blocked domain', status=403)
     try:
-        r = requests.get(url, stream=True, timeout=8)
+        headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                "Referer": "https://www.instagram.com/",
+        }
+
+        r = requests.get(url, headers=headers, stream=True, timeout=8)
         r.raise_for_status()
         content_type = r.headers.get('Content-Type', 'image/jpeg')
         # Evita download, só mostra imagem
