@@ -423,6 +423,7 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  text-transform: uppercase;
 }
 
 .salon-nav-menu a::before {
