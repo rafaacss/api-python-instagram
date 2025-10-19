@@ -2,7 +2,10 @@ name: Build and Push (GHCR)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
+    paths-ignore:
+      - 'k8s/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 jobs:
