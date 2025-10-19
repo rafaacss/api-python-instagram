@@ -1,113 +1,44 @@
-name: Build & Deploy to Kubernetes
+name: Deploy Instagram API to K3s
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'k8s/**'
-      - '.github/workflows/deploy.yml'
+    branches: [ main ]   # ajuste se quiser development etc.
   workflow_dispatch:
 
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/api-python-instagram
-
-concurrency:
-  group: deploy-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          install: true
-      - name: Build & Push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: read
+    runs-on: [self-hosted, Linux, ARM64]   # igual ao seu outro projeto
+
     steps:
-      - uses: actions/checkout@v4
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup kubectl
+      - name: 🔧 Setup kubectl
         uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
 
-      - name: Write kubeconfig
+      - name: 🔐 Configurar kubeconfig (K3s local)
         run: |
-          mkdir -p ~/.kube
-          cat > ~/.kube/config <<'EOF'
-          ${{ secrets.KUBE_CONFIG }}
-          EOF
+          mkdir -p $HOME/.kube
+          # Se o runner roda como root, pode remover 'sudo'
+          sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
+          sudo chown $USER:$USER $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          # troca 127.0.0.1 pelo IP público se necessário (evita proxy local)
+          # sed -i "s#server: https\?://127\.0\.0\.1:6443#server: https://132.226.86.74:6443#g" $HOME/.kube/config || true
 
-      - name: Show kubectl context and server
+      - name: ✅ Verificar conexão
         run: |
           kubectl config view --minify
-          echo "Server URL:"
-          kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
-          echo "Trying to reach API..."
-          curl -skI $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')    
+          echo "Server URL:" && kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
+          kubectl get nodes
 
-      - name: Show cluster info (sanity check)
+      - name: 🧱 Namespace
         run: |
-          kubectl -n instagram-api get deploy || true
-          kubectl -n instagram-api get svc || true
+          kubectl create namespace instagram-api --dry-run=client -o yaml | kubectl apply -f -
 
-      # Aplica/atualiza ConfigMap, Service, Ingress, HPA e Deployment
-      - name: Apply base manifests
-        run: |
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/configmap.yaml
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/ingress.yaml
-          kubectl apply -f k8s/hpa.yaml || true
-          kubectl apply -f k8s/deployment.yaml
-
-      # (Re)cria Secret a partir dos GitHub Secrets
-      - name: Apply instagram-secrets from GH secrets (idempotent)
-        run: |
-          kubectl -n instagram-api create secret generic instagram-secrets \
-            --from-literal=INSTAGRAM_APP_ID="${{ secrets.INSTAGRAM_APP_ID }}" \
-            --from-literal=INSTAGRAM_APP_SECRET="${{ secrets.INSTAGRAM_APP_SECRET }}" \
-            --from-literal=INSTAGRAM_ACCESS_TOKEN="${{ secrets.INSTAGRAM_ACCESS_TOKEN }}" \
-            --from-literal=INSTAGRAM_BUSINESS_ACCOUNT_ID="${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}" \
-            --from-literal=GOOGLE_PLACE_ID="${{ secrets.GOOGLE_PLACE_ID }}" \
-            --from-literal=GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
-            --from-literal=WARMUP_TOKEN="${{ secrets.WARMUP_TOKEN }}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-      # Atualiza a imagem do Deployment para o SHA atual
-      - name: Set image to current SHA
-        run: |
-          kubectl -n instagram-api set image deployment/instagram-api \
-            api=${{ env.IMAGE }}:${{ github.sha }}
-
-      - name: Wait for rollout
-        run: |
-          kubectl -n instagram-api rollout status deployment/instagram-api --timeout=180s
-          kubectl -n instagram-api get pods -o wide
+      # (Opcional) View cluster-wide para logs/diagnósticos
+      # - name: 🔭 Dar view cluster-wide (opcional)
+      #   run: |
+      #
