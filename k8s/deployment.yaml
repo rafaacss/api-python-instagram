@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: instagram-api
+  namespace: instagram-api
+  labels:
+    app: instagram-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: instagram-api
+  template:
+    metadata:
+      labels:
+        app: instagram-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/rafaacss/api-python-instagram:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: instagram-config
+            - secretRef:
+                name: instagram-secrets
+          ports:
+            - name: http
+              containerPort: 8000
+          volumeMounts:
+            - name: media-cache
+              mountPath: /var/cache/igmedia
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "512Mi"
+      volumes:
+        - name: media-cache
+          emptyDir:
+            sizeLimit: 100Mi

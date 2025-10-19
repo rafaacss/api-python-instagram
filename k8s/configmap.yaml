@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: instagram-config
+  namespace: instagram-api
+data:
+  PORT: "8000"
+  HEALTH_PATH: "/health"
+  LOG_LEVEL: "info"
+  CACHE_DURATION_SECONDS: "3600"
+  MEDIA_CACHE_TTL_SECONDS: "3600"
+  MEDIA_CACHE_DIR: "/var/cache/igmedia"
+  MEDIA_CACHE_MAX_BYTES: "26214400"
+  WARMUP_SLEEP_SECONDS: "0.25"
