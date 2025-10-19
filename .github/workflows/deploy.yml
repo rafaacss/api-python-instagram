@@ -65,6 +65,14 @@ jobs:
           ${{ secrets.KUBE_CONFIG }}
           EOF
 
+      - name: Show kubectl context and server
+        run: |
+          kubectl config view --minify
+          echo "Server URL:"
+          kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
+          echo "Trying to reach API..."
+          curl -skI $(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')    
+
       - name: Show cluster info (sanity check)
         run: |
           kubectl version --client
