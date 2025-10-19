@@ -75,10 +75,8 @@ jobs:
 
       - name: Show cluster info (sanity check)
         run: |
-          kubectl version --client
-          kubectl cluster-info
-          kubectl -n instagram-api get ns || true
-          kubectl get ns
+          kubectl -n instagram-api get deploy || true
+          kubectl -n instagram-api get svc || true
 
       # Aplica/atualiza ConfigMap, Service, Ingress, HPA e Deployment
       - name: Apply base manifests
