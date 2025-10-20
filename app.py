@@ -529,26 +529,23 @@ def warmup_route():
 @app.route('/api/instagram/proxy-image', methods=['GET'])
 def proxy_image_legacy():
     """
-    Mantém compatibilidade:
-      - Se receber ?id=<media_id> → usa o fluxo do media_proxy (com cache/range).
-      - Se receber ?url=/api/instagram/media_proxy?id=<media_id> (relativa/absoluta) → extrai o id e usa o mesmo fluxo.
-      - Se receber URL absoluta de domínios IG/CDN → proxy simples (stream).
-      - Demais hosts → 403.
+    Compatibilidade mantida na MESMA URL:
+      - Se receber ?id=<media_id> → redireciona 302 para /api/instagram/media_proxy?id=<id>
+      - Se receber ?url=/api/instagram/media_proxy?id=<id> (relativa/absoluta) → extrai o id e redireciona 302
+      - Se receber URL absoluta de domínios IG/CDN → proxy simples (stream)
+      - Demais hosts → 403
     """
-    media_id = request.args.get('id', '').strip()
-    raw = request.args.get('url', '').strip()
+    media_id = (request.args.get('id') or '').strip()
+    raw = (request.args.get('url') or '').strip()
 
-    # 1) Atalho: veio id direto
+    # 1) Atalho: veio id direto -> redireciona pro media_proxy
     if media_id:
-        # Reaproveita lógica do media_proxy sem redirecionar
-        with app.test_request_context(f"/api/instagram/media_proxy?id={media_id}", method='GET', headers=request.headers):
-            return media_proxy()
+        return redirect(f"/api/instagram/media_proxy?id={media_id}", code=302)
 
-    # 2) Veio "url" → tentar extrair media_id se for seu próprio media_proxy
     if not raw:
         return Response('Missing id or url', status=400)
 
-    # Se vier relativo, resolvemos para absoluto no mesmo host
+    # 2) Normaliza para absoluto se vier relativo
     if raw.startswith('/'):
         url = urljoin(request.host_url, raw)
     else:
@@ -557,33 +554,26 @@ def proxy_image_legacy():
     parsed = urlparse(url)
     hostname = (parsed.hostname or '').lower()
 
-    # Allowlist: seu host + alguns IG/CDN comuns
+    # 3) Allowlist de hosts
     allowed_hosts = {
-        request.host.lower(),
+        request.host.split(':', 1)[0].lower(),  # seu próprio host (sem porta)
         'graph.instagram.com',
         'instagram.com', 'www.instagram.com',
         'scontent.cdninstagram.com',
-        # POPs variam, então validamos por terminação "fna.fbcdn.net"
     }
-
-    if hostname.endswith('fna.fbcdn.net'):
-        allowed = True
-    else:
-        allowed = hostname in allowed_hosts
-
-    if not allowed:
+    is_allowed = hostname in allowed_hosts or hostname.endswith('fna.fbcdn.net')
+    if not is_allowed:
         return Response('Blocked domain', status=403)
 
-    # Se a URL for seu próprio media_proxy → extrair id e usar o fluxo com cache
-    if hostname == request.host.lower() and parsed.path.startswith('/api/instagram/media_proxy'):
+    # 4) Se for o seu próprio media_proxy -> extrai id e redireciona 302
+    if hostname == request.host.split(':', 1)[0].lower() and parsed.path.startswith('/api/instagram/media_proxy'):
         q = parse_qs(parsed.query)
         mid = (q.get('id') or [''])[0]
         if not mid:
             return Response('Missing id', status=400)
-        with app.test_request_context(f"/api/instagram/media_proxy?id={mid}", method='GET', headers=request.headers):
-            return media_proxy()
+        return redirect(f"/api/instagram/media_proxy?id={mid}", code=302)
 
-    # Caso contrário, é IG/CDN → proxy simples
+    # 5) Caso contrário: é IG/CDN -> proxy simples (stream)
     try:
         r = requests.get(url, stream=True, timeout=15)
         r.raise_for_status()
