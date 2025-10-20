@@ -2,12 +2,12 @@ name: Deploy Instagram API to K3s
 
 on:
   push:
-    branches: [ main ]   # ajuste se quiser development etc.
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, Linux, ARM64]   # igual ao seu outro projeto
+    runs-on: [self-hosted, Linux, ARM64]
 
     steps:
       - name: 📥 Checkout
@@ -18,27 +18,27 @@ jobs:
         with:
           version: v1.31.0
 
-      - name: 🔐 Configurar kubeconfig (K3s local)
+      - name: 🔐 Configure kubectl with token
         run: |
-          mkdir -p $HOME/.kube
-          # Se o runner roda como root, pode remover 'sudo'
-          sudo cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
-          sudo chown $USER:$USER $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-          # troca 127.0.0.1 pelo IP público se necessário (evita proxy local)
-          # sed -i "s#server: https\?://127\.0\.0\.1:6443#server: https://132.226.86.74:6443#g" $HOME/.kube/config || true
+          kubectl config set-cluster vps-oracle-k3s \
+            --server=https://132.226.86.74:6443 \
+            --insecure-skip-tls-verify=true
+          
+          kubectl config set-credentials github-deployer \
+            --token=${{ secrets.KUBE_TOKEN }}
+          
+          kubectl config set-context github-deployer@vps-oracle-k3s \
+            --cluster=vps-oracle-k3s \
+            --user=github-deployer \
+            --namespace=instagram-api
+          
+          kubectl config use-context github-deployer@vps-oracle-k3s
 
       - name: ✅ Verificar conexão
         run: |
           kubectl config view --minify
-          echo "Server URL:" && kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'; echo
           kubectl get nodes
 
       - name: 🧱 Namespace
         run: |
           kubectl create namespace instagram-api --dry-run=client -o yaml | kubectl apply -f -
-
-      # (Opcional) View cluster-wide para logs/diagnósticos
-      # - name: 🔭 Dar view cluster-wide (opcional)
-      #   run: |
-      #
