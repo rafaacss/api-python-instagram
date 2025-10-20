@@ -40,4 +40,4 @@ COPY . /app
 # RUN poetry install --only main --no-interaction --no-ansi
 
 # Ajuste o módulo/objeto ASGI abaixo se necessário (ex.: src.main:app)
-CMD ["bash", "-lc", "exec gunicorn -k uvicorn.workers.UvicornWorker app:app -b 0.0.0.0:${PORT} --timeout 120"]
+CMD ["/venv/bin/uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
