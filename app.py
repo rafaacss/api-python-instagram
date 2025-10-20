@@ -547,6 +547,8 @@ def proxy_image_legacy():
     hostname = (parsed.hostname or '').lower()
     myhost = request.host.split(':', 1)[0].lower()
 
+
+
     # 3) Allowlist de hosts
     allowed_hosts = {
         myhost,
