@@ -42,3 +42,24 @@ jobs:
       - name: 🧱 Namespace
         run: |
           kubectl create namespace instagram-api --dry-run=client -o yaml | kubectl apply -f -
+
+      # ADICIONE ESTES PASSOS AQUI:
+      - name: 🚀 Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secret-instagram.yaml
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/ingress.yaml
+
+      - name: 🔄 Rollout restart deployment
+        run: |
+          kubectl rollout restart deployment/instagram-api -n instagram-api
+          kubectl rollout status deployment/instagram-api -n instagram-api --timeout=5m
+
+      - name: 📊 Show deployment status
+        run: |
+          kubectl get pods -n instagram-api
+          kubectl get svc -n instagram-api
+          kubectl get ingress -n instagram-api
