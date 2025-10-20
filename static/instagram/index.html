@@ -6,6 +6,52 @@
 </head>
 <body>
 <div class="elfsight-app-redbeauty eapps-instagram-feed es-widget eapps-widget"></div>
+<script>
+    // precisa rodar ANTES do instashow.js inicializar o widget
+    (function () {
+        const oldFetch = window.fetch;
+        window.fetch = async function(input, init) {
+            const url = typeof input === 'string' ? input : (input && input.url) || '';
+            // Intercepta a chamada ao seu /api/instagram/posts
+            if (url.includes('/api/instagram/posts')) {
+                const resp = await oldFetch(input, init);
+                const clone = resp.clone();
+                try {
+                    const json = await clone.json();
+                    if (json && Array.isArray(json.payload)) {
+                        json.payload = json.payload.map(item => {
+                            // já existe?
+                            if (Array.isArray(item.images) && item.images.length && item.images[0].url) {
+                                return item;
+                            }
+                            const images = [];
+                            // usa a lista "media" para construir images
+                            (item.media || []).forEach(m => {
+                                const u =
+                                    (m?.cover?.thumbnail?.url) ||
+                                    m?.url ||
+                                    null;
+                                if (u) images.push({ url: u });
+                            });
+                            // fallback para não deixar vazio
+                            if (!images.length) images.push({ url: '/api/instagram/proxy-image?url=/static/instagram/placeholder.png' });
+                            return { ...item, images, image: images[0].url };
+                        });
+                        // devolve uma Response com o JSON ajustado
+                        return new Response(JSON.stringify(json), {
+                            status: resp.status,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
+                } catch (_) {
+                    // se não for JSON, segue normal
+                }
+                return resp;
+            }
+            return oldFetch(input, init);
+        };
+    })();
+</script>
 <script src="instagram.js"></script>
 </body>
 </html>
