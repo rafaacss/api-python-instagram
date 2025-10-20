@@ -1,14 +1,17 @@
 name: Deploy Instagram API to K3s
 
 on:
-  push:
+  workflow_run:
+    workflows: [ "Build and Push (GHCR)" ]  # ← Aguarda o build terminar
+    types:
+      - completed
     branches: [ main ]
-  workflow_dispatch:
+    workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: [self-hosted, Linux, ARM64]
-
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
