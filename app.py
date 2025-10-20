@@ -120,17 +120,19 @@ def _ext_from_content_type(ct: str) -> str:
     return mimetypes.guess_extension(ct) or ''
 
 
-def _cache_paths(media_id: str, content_type: str = None):
-    """Retorna caminho do arquivo e do .meta (content-type)."""
+def _cache_paths(media_id: str, content_type: str = None, kind: str = "image"):
+    # procura arquivos já existentes desta variante
+    prefix = f"{media_id}-{kind}."
     for name in os.listdir(MEDIA_CACHE_DIR):
-        if name.startswith(media_id + "."):
+        if name.startswith(prefix):
             p = os.path.join(MEDIA_CACHE_DIR, name)
-            meta = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
+            meta = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}.meta")
             return p, meta
     ext = _ext_from_content_type(content_type) if content_type else '.bin'
-    file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}{ext}")
-    meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
+    file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}{ext}")
+    meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}.meta")
     return file_path, meta_path
+
 
 
 def _write_meta(meta_path: str, content_type: str):
@@ -187,32 +189,28 @@ def drop_media_cache(media_id: str):
                 pass
 
 
-def ensure_media_cached(media_id: str) -> tuple[str, str]:
-    """
-    Garante mídia em cache; retorna (file_path, content_type).
-    Se arquivo fresco já existir, usa. Senão busca via Graph, baixa e salva.
-    Pode não salvar se exceder MEDIA_CACHE_MAX_BYTES; nesse caso retorna ('','').
-    """
-    existing_file, existing_meta = _cache_paths(media_id)
+def ensure_media_cached(media_id: str, kind: str = "image") -> tuple[str, str]:
+    existing_file, existing_meta = _cache_paths(media_id, kind=kind)
     if os.path.exists(existing_file) and _is_cache_fresh(existing_file):
         return existing_file, _read_meta(existing_meta)
 
     info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
-    src = info.get("media_url") or info.get("thumbnail_url")
+    src = _pick_src_by_kind(info, kind)
     if not src:
-        print(f"[ensure_media_cached] sem media_url/thumbnail_url para {media_id}. info={info}")
+        print(f"[ensure_media_cached] sem src para {media_id} kind={kind}. info={info}")
         return '', ''
 
     with requests.get(src, stream=True, timeout=30) as cdn:
         cdn.raise_for_status()
         ct = cdn.headers.get('Content-Type', 'application/octet-stream')
-        file_path, meta_path = _cache_paths(media_id, ct)
+        file_path, meta_path = _cache_paths(media_id, ct, kind)
         saved_path = _save_stream_to_file(cdn, file_path, MEDIA_CACHE_MAX_BYTES)
     if saved_path:
         _write_meta(meta_path, ct)
         os.utime(saved_path, None)
         return saved_path, ct
-    return '', ''  # muito grande → não cacheado
+    return '', ''
+
 
 
 # =========================
@@ -270,42 +268,34 @@ def get_user_profile_route():
 
 @app.route('/api/instagram/media_proxy', methods=['GET'])
 def media_proxy():
-    """
-    Proxy por media_id com cache em disco:
-    - se arquivo fresco existir → serve do arquivo (com Range)
-    - senão → baixa da CDN (via Graph), salva (se <= limite) e serve
-    Forçar refresh: /api/instagram/media_proxy?id=<id>&refresh=1
-    """
     media_id = request.args.get('id')
+    kind = (request.args.get('kind') or 'image').lower()  # image|video|thumbnail
     if not media_id:
         return Response('Missing id', status=400)
 
     refresh = request.args.get('refresh') == '1'
-
     try:
         if not refresh:
-            file_path, ct = ensure_media_cached(media_id)
+            file_path, ct = ensure_media_cached(media_id, kind)
             if file_path and os.path.exists(file_path):
                 return serve_file_with_range(file_path, ct)
 
-        # refresh forçado ou cache indisponível
         info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
-        src = info.get("media_url") or info.get("thumbnail_url")
+        src = _pick_src_by_kind(info, kind)
         if not src:
-            print(f"[media_proxy] media_id={media_id} sem media_url/thumbnail_url. info={info}")
+            print(f"[media_proxy] sem src media_id={media_id} kind={kind} info={info}")
             return Response('No media_url available', status=502)
 
         with requests.get(src, stream=True, timeout=30) as cdn:
             cdn.raise_for_status()
             ct = cdn.headers.get('Content-Type', 'application/octet-stream')
-            file_path, meta_path = _cache_paths(media_id, ct)
+            file_path, meta_path = _cache_paths(media_id, ct, kind)
             saved_path = _save_stream_to_file(cdn, file_path, MEDIA_CACHE_MAX_BYTES)
 
         if saved_path:
             _write_meta(meta_path, ct)
             return serve_file_with_range(saved_path, ct)
 
-        # fallback sem cache (muito grande)
         cdn2 = requests.get(src, stream=True, timeout=30)
         cdn2.raise_for_status()
         return Response(cdn2.iter_content(chunk_size=1024 * 64),
@@ -359,14 +349,14 @@ def get_user_posts():
 
         def make_cover(mid: str):
             return {
-                "thumbnail": {
-                    "url": f"/api/instagram/media_proxy?id={mid}",
-                    "width": width,
-                    "height": height
-                },
-                "standard": None,
-                "original": None
-            }
+                    "thumbnail": {
+                        "url": f"/api/instagram/media_proxy?id={mid}&kind=image",
+                        "width": width,
+                        "height": height
+                    },
+                    "standard": None,
+                    "original": None
+                }
 
         for post in api_data.get("data", []):
             author = {
@@ -386,11 +376,14 @@ def get_user_posts():
             pid = post.get("id")
 
             if ptype in ("IMAGE", "VIDEO"):
+                mid = post.get("id")
+                # Para front que usa <img>, servir a thumb para VIDEO
+                url = f"/api/instagram/media_proxy?id={mid}&kind=image"
                 media_items.append({
                     "type": ptype.lower(),
-                    "url": f"/api/instagram/media_proxy?id={pid}",
-                    "cover": make_cover(pid),
-                    "id": pid
+                    "url": url,
+                    "cover": make_cover(mid),  # pode manter igual (usa kind=image dentro)
+                    "id": mid
                 })
             elif ptype == "CAROUSEL_ALBUM":
                 for child in (post.get("children") or {}).get("data", []):
@@ -540,7 +533,7 @@ def proxy_image_legacy():
 
     # 1) Atalho: veio id direto -> redireciona pro media_proxy
     if media_id:
-        return redirect(f"/api/instagram/media_proxy?id={media_id}", code=302)
+        return redirect(f"/api/instagram/media_proxy?id={mid}&kind=image", code=302)
 
     if not raw:
         return Response('Missing id or url', status=400)
@@ -571,7 +564,7 @@ def proxy_image_legacy():
         mid = (q.get('id') or [''])[0]
         if not mid:
             return Response('Missing id', status=400)
-        return redirect(f"/api/instagram/media_proxy?id={mid}", code=302)
+        return redirect(f"/api/instagram/media_proxy?id={mid}&kind=image", code=302)
 
     # 5) Caso contrário: é IG/CDN -> proxy simples (stream)
     try:
@@ -652,6 +645,23 @@ def serve_static_instagram(filename):
     with open(filepath, 'rb') as f:
         content = f.read()
     return Response(content, mimetype=mimetype)
+
+def _pick_src_by_kind(info: dict, kind: str) -> str:
+    mtype = (info.get("media_type") or "").upper()
+    media_url = info.get("media_url")
+    thumb_url = info.get("thumbnail_url")
+
+    if kind == "thumbnail":
+        return thumb_url or media_url or ""
+    if kind == "video":
+        # Preferir o arquivo de vídeo se for VIDEO
+        if mtype == "VIDEO":
+            return media_url or ""
+        return media_url or thumb_url or ""
+    # kind == "image" (default): ideal para <img>
+    if mtype == "VIDEO":
+        return thumb_url or ""          # <== thumbnail para vídeos
+    return media_url or thumb_url or ""
 
 
 # =========================
