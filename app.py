@@ -159,25 +159,54 @@ def _is_cache_fresh(file_path: str) -> bool:
     return age <= MEDIA_CACHE_TTL_SECONDS
 
 
-def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int) -> str:
-    """Salva stream respeitando um limite de bytes. Retorna caminho usado (ou '' se abortar)."""
+def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int, min_bytes: int = 1024) -> str:
+    """
+    Salva stream respeitando um limite de bytes.
+    - Se total < min_bytes (default 1 KiB), considera inválido e NÃO salva.
+    - Se existir Content-Length e total != Content-Length -> NÃO salva.
+    Retorna caminho usado (ou '' se abortar).
+    """
     tmp_path = dst_path + ".tmp"
     total = 0
-    with open(tmp_path, 'wb') as f:
-        for chunk in resp.iter_content(chunk_size=1024 * 64):
-            if chunk:
+    try:
+        with open(tmp_path, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=1024 * 64):
+                if not chunk:
+                    continue
                 total += len(chunk)
                 if total > max_bytes:
+                    # excedeu o limite: aborta
                     f.close()
-                    try: os.remove(tmp_path)
-                    except Exception: pass
+                    os.remove(tmp_path)
                     return ''
                 f.write(chunk)
-    if os.path.exists(dst_path):
-        try: os.remove(dst_path)
-        except Exception: pass
-    os.rename(tmp_path, dst_path)
-    return dst_path
+        # validações finais
+        cl = resp.headers.get('Content-Length')
+        if cl is not None:
+            try:
+                cl = int(cl)
+                if cl > 0 and total != cl:
+                    os.remove(tmp_path)
+                    return ''
+            except Exception:
+                pass
+        if total < min_bytes:
+            os.remove(tmp_path)
+            return ''
+        # troca atômica
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        os.rename(tmp_path, dst_path)
+        return dst_path
+    except Exception:
+        # limpeza no erro
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+        return ''
+
 
 
 def drop_media_cache(media_id: str):
@@ -294,7 +323,6 @@ def handle_media_proxy(media_id: str, kind: str = "image", refresh: bool = False
 
         if saved_path:
             _write_meta(meta_path, ct)
-
             resp = serve_file_with_range(saved_path, ct)
             resp.headers['Content-Type'] = ct
             resp.headers['Cache-Control'] = 'public, max-age=86400'
