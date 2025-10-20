@@ -3,7 +3,7 @@ import time
 import mimetypes
 import argparse
 import requests
-from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response, redirect
+from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response
 from dotenv import load_dotenv
 from flask_cors import CORS
 from urllib.parse import urlparse, urljoin, parse_qs
@@ -16,16 +16,13 @@ CORS(app)
 # Config Rafael API
 # =========================
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
-# Para Basic Display não precisamos do ID numérico; "me" resolve. Se vier vazio, usa "me".
-USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID') or 'me'
-# Basic Display API
+USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID') or 'me'  # para Basic Display "me" funciona
 GRAPH_API_URL = 'https://graph.instagram.com/v22.0'
 
 CACHE_DURATION_SECONDS = int(os.getenv('CACHE_DURATION_SECONDS', '3600'))  # posts (1h)
 PLACE_ID = os.getenv('GOOGLE_PLACE_ID')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
-# Usa /tmp por padrão para evitar problema de permissão em imagens
 MEDIA_CACHE_DIR = os.getenv('MEDIA_CACHE_DIR', '/tmp/instagram-cache')
 MEDIA_CACHE_TTL_SECONDS = int(os.getenv('MEDIA_CACHE_TTL_SECONDS', '3600'))  # mídias (1h)
 MEDIA_CACHE_MAX_BYTES = int(os.getenv('MEDIA_CACHE_MAX_BYTES', str(100 * 1024 * 1024)))  # 100MB
@@ -34,12 +31,12 @@ WARMUP_SLEEP_SECONDS = float(os.getenv('WARMUP_SLEEP_SECONDS', '0.25'))
 
 os.makedirs(MEDIA_CACHE_DIR, exist_ok=True)
 
-# Cache simples com TTL (em memória) para respostas JSON
+# Cache simples com TTL (em memória) p/ respostas JSON
 api_cache = {}  # key -> {"data": ..., "ts": epoch}
 
 
 # =========================
-# Utils de cache em memória
+# Utils cache em memória
 # =========================
 def get_from_cache(key):
     item = api_cache.get(key)
@@ -82,7 +79,6 @@ def fetch_user_profile():
     if cached:
         return cached
 
-    # Basic Display: apenas id, username são garantidos
     data = ig_get("me", "id,username")
 
     payload = {
@@ -100,7 +96,7 @@ def fetch_user_profile():
 
 
 # =========================
-# Cache de mídia em DISCO (por media_id)
+# Cache de mídia em DISCO (por media_id/kind)
 # =========================
 def _ext_from_content_type(ct: str) -> str:
     if not ct:
@@ -122,7 +118,7 @@ def _ext_from_content_type(ct: str) -> str:
 
 
 def _cache_paths(media_id: str, content_type: str = None, kind: str = "image"):
-    # procura arquivos já existentes desta variante
+    """Retorna caminhos do arquivo e do .meta p/ (media_id, kind)."""
     prefix = f"{media_id}-{kind}."
     for name in os.listdir(MEDIA_CACHE_DIR):
         if name.startswith(prefix):
@@ -133,7 +129,6 @@ def _cache_paths(media_id: str, content_type: str = None, kind: str = "image"):
     file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}{ext}")
     meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}.meta")
     return file_path, meta_path
-
 
 
 def _write_meta(meta_path: str, content_type: str):
@@ -161,10 +156,9 @@ def _is_cache_fresh(file_path: str) -> bool:
 
 def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int, min_bytes: int = 1024) -> str:
     """
-    Salva stream respeitando um limite de bytes.
-    - Se total < min_bytes (default 1 KiB), considera inválido e NÃO salva.
-    - Se existir Content-Length e total != Content-Length -> NÃO salva.
-    Retorna caminho usado (ou '' se abortar).
+    Salva stream respeitando limite de bytes e valida integridade.
+    - Se total < min_bytes => não salva.
+    - Se houver Content-Length e total != Content-Length => não salva.
     """
     tmp_path = dst_path + ".tmp"
     total = 0
@@ -175,12 +169,11 @@ def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int,
                     continue
                 total += len(chunk)
                 if total > max_bytes:
-                    # excedeu o limite: aborta
                     f.close()
                     os.remove(tmp_path)
                     return ''
                 f.write(chunk)
-        # validações finais
+
         cl = resp.headers.get('Content-Length')
         if cl is not None:
             try:
@@ -190,16 +183,16 @@ def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int,
                     return ''
             except Exception:
                 pass
+
         if total < min_bytes:
             os.remove(tmp_path)
             return ''
-        # troca atômica
+
         if os.path.exists(dst_path):
             os.remove(dst_path)
         os.rename(tmp_path, dst_path)
         return dst_path
     except Exception:
-        # limpeza no erro
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
@@ -208,15 +201,32 @@ def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int,
         return ''
 
 
-
 def drop_media_cache(media_id: str):
-    """Remove arquivos de cache (mídia + meta) de um media_id."""
+    """Remove arquivos de cache (mídia + meta) de um media_id (todas as variants)."""
     for name in os.listdir(MEDIA_CACHE_DIR):
-        if name.startswith(media_id + "."):
+        if name.startswith(media_id + "-"):
             try:
                 os.remove(os.path.join(MEDIA_CACHE_DIR, name))
             except Exception:
                 pass
+
+
+def _pick_src_by_kind(info: dict, kind: str) -> str:
+    """Seleciona a fonte ideal conforme kind para estabilidade do <img>."""
+    mtype = (info.get("media_type") or "").upper()
+    media_url = info.get("media_url")
+    thumb_url = info.get("thumbnail_url")
+
+    if kind == "thumbnail":
+        return thumb_url or media_url or ""
+    if kind == "video":
+        if mtype == "VIDEO":
+            return media_url or ""
+        return media_url or thumb_url or ""
+    # kind == "image" (default): ideal para <img>
+    if mtype == "VIDEO":
+        return thumb_url or ""   # <img> recebe thumb de vídeo
+    return media_url or thumb_url or ""
 
 
 def ensure_media_cached(media_id: str, kind: str = "image") -> tuple[str, str]:
@@ -240,7 +250,6 @@ def ensure_media_cached(media_id: str, kind: str = "image") -> tuple[str, str]:
         os.utime(saved_path, None)
         return saved_path, ct
     return '', ''
-
 
 
 # =========================
@@ -328,11 +337,14 @@ def handle_media_proxy(media_id: str, kind: str = "image", refresh: bool = False
             resp.headers['Cache-Control'] = 'public, max-age=86400'
             return resp
 
+        # fallback sem cache (ex.: arquivo muito grande ou falha de validação)
         cdn2 = requests.get(src, stream=True, timeout=30)
         cdn2.raise_for_status()
-        return Response(cdn2.iter_content(chunk_size=1024 * 64),
-                        content_type=ct,
-                        direct_passthrough=True)
+        return Response(
+            cdn2.iter_content(chunk_size=1024 * 64),
+            content_type=ct,
+            direct_passthrough=True
+        )
 
     except requests.exceptions.RequestException as e:
         status = getattr(e.response, 'status_code', 500)
@@ -355,12 +367,12 @@ def media_proxy():
     refresh = request.args.get('refresh') == '1'
     return handle_media_proxy(media_id, kind, refresh)
 
+
 @app.route('/api/instagram/posts', methods=['GET'])
 def get_user_posts():
     """
     Retorna posts mantendo a estrutura antiga de media_items,
-    mas substitui as URLs da CDN por URLs do backend:
-      /api/instagram/media_proxy?id=<media_id>
+    mas substitui as URLs da CDN por URLs do backend (media_proxy).
     Compatível com Basic Display (sem counts/insights).
     """
     username = request.args.get('username', 'me')
@@ -378,9 +390,11 @@ def get_user_posts():
     except Exception as e:
         return jsonify({"error": "Falha ao buscar perfil: " + str(e)}), 500
 
-    fields = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,username,children{id,media_type,media_url,thumbnail_url}"
+    fields = (
+        "id,caption,media_type,media_url,thumbnail_url,permalink,"
+        "timestamp,username,children{id,media_type,media_url,thumbnail_url}"
+    )
     try:
-        # Basic Display: use "me/media"
         api_data = ig_get("me/media", fields)
         formatted_posts = []
 
@@ -388,14 +402,14 @@ def get_user_posts():
 
         def make_cover(mid: str):
             return {
-                    "thumbnail": {
-                        "url": f"/api/instagram/media_proxy?id={mid}&kind=image",
-                        "width": width,
-                        "height": height
-                    },
-                    "standard": None,
-                    "original": None
-                }
+                "thumbnail": {
+                    "url": f"/api/instagram/media_proxy?id={mid}&kind=image",
+                    "width": width,
+                    "height": height
+                },
+                "standard": None,
+                "original": None
+            }
 
         for post in api_data.get("data", []):
             author = {
@@ -416,12 +430,11 @@ def get_user_posts():
 
             if ptype in ("IMAGE", "VIDEO"):
                 mid = post.get("id")
-                # Para front que usa <img>, servir a thumb para VIDEO
                 url = f"/api/instagram/media_proxy?id={mid}&kind=image"
                 media_items.append({
                     "type": ptype.lower(),
                     "url": url,
-                    "cover": make_cover(mid),  # pode manter igual (usa kind=image dentro)
+                    "cover": make_cover(mid),
                     "id": mid
                 })
             elif ptype == "CAROUSEL_ALBUM":
@@ -430,7 +443,7 @@ def get_user_posts():
                     mid = child.get("id")
                     media_items.append({
                         "type": ctype.lower(),
-                        "url": f"/api/instagram/media_proxy?id={mid}",
+                        "url": f"/api/instagram/media_proxy?id={mid}&kind=image",  # garante <img>
                         "cover": make_cover(mid),
                         "id": mid
                     })
@@ -468,10 +481,9 @@ def get_user_posts():
 
 
 # =========================
-# WARM-UP (endpoint + helpers)
+# WARM-UP
 # =========================
 def collect_media_ids(limit_posts: int = 20) -> list[str]:
-    """Coleta media_ids dos últimos posts (inclui filhos de carrossel) até atingir limit_posts."""
     ids: list[str] = []
     got_posts = 0
     fields = "id,media_type,children{id,media_type}"
@@ -490,7 +502,6 @@ def collect_media_ids(limit_posts: int = 20) -> list[str]:
                     for child in (post.get("children") or {}).get("data", []):
                         ids.append(child.get("id"))
                 got_posts += 1
-
             url = (data.get("paging") or {}).get("next")
     except requests.exceptions.RequestException:
         pass
@@ -509,7 +520,6 @@ def warmup(limit_posts: int = 20, force: bool = False) -> dict:
     mids = collect_media_ids(limit_posts)
     ok, skipped, failed = 0, 0, 0
     details = []
-
     for mid in mids:
         try:
             if force:
@@ -525,7 +535,6 @@ def warmup(limit_posts: int = 20, force: bool = False) -> dict:
             failed += 1
             details.append({"id": mid, "status": "failed", "error": str(e)})
         time.sleep(WARMUP_SLEEP_SECONDS)
-
     return {"posts_scanned": limit_posts, "media_found": len(mids), "cached": ok, "skipped": skipped, "failed": failed, "details": details}
 
 
@@ -556,32 +565,32 @@ def warmup_route():
 
 
 # =========================
-# Legacy proxy (mantido na MESMA URL)
+# Legacy proxy (mesma URL)
 # =========================
 @app.route('/api/instagram/proxy-image', methods=['GET'])
 def proxy_image_legacy():
     """
     Compatibilidade na MESMA URL, sem 302:
-      - ?id=<media_id> → serve como image (thumb p/ vídeo)
-      - ?url=/api/instagram/media_proxy?id=<media_id> → extrai id e serve igual
-      - URL absoluta IG/CDN → proxy simples (stream)
-      - Demais hosts → 403
+      - ?id=<media_id>&kind=image|video|thumbnail → serve pelo helper
+      - ?url=/api/instagram/media_proxy?id=<media_id>&kind=image → extrai e serve
+      - URL absoluta IG/CDN → proxy simples (stream) para hosts permitidos
     """
     media_id = (request.args.get('id') or '').strip()
     kind_arg = (request.args.get('kind') or 'image').lower()
     if media_id:
         return handle_media_proxy(media_id, kind=kind_arg, refresh=False)
 
+    raw = (request.args.get('url') or '').strip()  # << importante
     if not raw:
         return Response('Missing id or url', status=400)
 
-    # 2) Normaliza para absoluto se vier relativo
+    # relativo → absoluto
     url = urljoin(request.host_url, raw) if raw.startswith('/') else raw
     parsed = urlparse(url)
     hostname = (parsed.hostname or '').lower()
     myhost = request.host.split(':', 1)[0].lower()
 
-    # 3) Allowlist de hosts
+    # allowlist
     allowed_hosts = {
         myhost,
         'graph.instagram.com',
@@ -592,59 +601,32 @@ def proxy_image_legacy():
     if not is_allowed:
         return Response('Blocked domain', status=403)
 
-    # 4) Se for seu próprio media_proxy -> extrai id e serve via helper
+    # se for o próprio media_proxy => extrai id/kind e delega
     if hostname == myhost and parsed.path.startswith('/api/instagram/media_proxy'):
         q = parse_qs(parsed.query)
         mid  = (q.get('id') or [''])[0]
-        kind = (q.get('kind') or ['image'])[0].lower()  # << pega o kind passado
+        kind = (q.get('kind') or ['image'])[0].lower()
         if not mid:
             return Response('Missing id', status=400)
         return handle_media_proxy(mid, kind=kind, refresh=False)
 
-    # 5) Caso contrário: IG/CDN -> proxy simples
+    # caso contrário: IG/CDN → stream direto
     try:
         r = requests.get(url, stream=True, timeout=15)
         r.raise_for_status()
         content_type = r.headers.get('Content-Type', 'image/jpeg')
-        return Response(r.iter_content(chunk_size=65536),
-                        content_type=content_type,
-                        direct_passthrough=True)
+        return Response(
+            r.iter_content(chunk_size=65536),
+            content_type=content_type,
+            direct_passthrough=True
+        )
     except Exception as e:
         print(f"[proxy-image] error url={url} err={e}")
         return Response(f'Error: {e}', status=500)
 
 
 # =========================
-# Google Reviews
-# =========================
-@app.route('/api/google/reviews')
-def google_reviews():
-    try:
-        reviews = get_google_reviews()
-        return jsonify({"code": 200, "payload": reviews})
-    except Exception as e:
-        return jsonify({"code": 500, "error": str(e)})
-
-
-def get_google_reviews():
-    if not PLACE_ID or not GOOGLE_API_KEY:
-        return []
-    url = (
-        "https://maps.googleapis.com/maps/api/place/details/json"
-        f"?place_id={PLACE_ID}"
-        f"&fields=reviews,rating,user_ratings_total,name"
-        f"&key={GOOGLE_API_KEY}"
-    )
-    response = requests.get(url, timeout=10)
-    data = response.json()
-    if "result" in data and "reviews" in data["result"]:
-        return data["result"]["reviews"]
-    else:
-        return []
-
-
-# =========================
-# Static
+# Static e Health
 # =========================
 ALLOWED_EXTENSIONS = {'.json', '.js'}
 
@@ -657,9 +639,11 @@ def allowed_file(filename):
 def serve_instagram_static(filename):
     return send_from_directory('static/instagram', filename)
 
+
 @app.route('/health')
 def health():
     return {'status': 'ok'}, 200
+
 
 @app.route('/static/instagramm/<filename>')
 def serve_static_instagram(filename):
@@ -681,30 +665,17 @@ def serve_static_instagram(filename):
         content = f.read()
     return Response(content, mimetype=mimetype)
 
-def _pick_src_by_kind(info: dict, kind: str) -> str:
-    mtype = (info.get("media_type") or "").upper()
-    media_url = info.get("media_url")
-    thumb_url = info.get("thumbnail_url")
-
-    if kind == "thumbnail":
-        return thumb_url or media_url or ""
-    if kind == "video":
-        # Preferir o arquivo de vídeo se for VIDEO
-        if mtype == "VIDEO":
-            return media_url or ""
-        return media_url or thumb_url or ""
-    # kind == "image" (default): ideal para <img>
-    if mtype == "VIDEO":
-        return thumb_url or ""          # <== thumbnail para vídeos
-    return media_url or thumb_url or ""
-
 
 # =========================
 # Main / CLI
 # =========================
 def cli_warmup(limit: int, force: bool):
     result = warmup(limit_posts=limit, force=force)
-    print(f"WARMUP => posts_scanned={result['posts_scanned']} media_found={result['media_found']} cached={result['cached']} skipped={result['skipped']} failed={result['failed']}")
+    print(
+        f"WARMUP => posts_scanned={result['posts_scanned']} "
+        f"media_found={result['media_found']} cached={result['cached']} "
+        f"skipped={result['skipped']} failed={result['failed']}"
+    )
 
 
 if __name__ == '__main__':
