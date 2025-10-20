@@ -7,6 +7,7 @@ import requests
 from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response
 from dotenv import load_dotenv
 from flask_cors import CORS
+from urllib.parse import urlparse, urljoin
 
 load_dotenv()
 app = Flask(__name__, static_folder='static')
@@ -307,7 +308,7 @@ def media_proxy():
 
     except requests.exceptions.RequestException as e:
         status = getattr(e.response, 'status_code', 500)
-        return Response(f'Error: {e}", status=status')
+        return Response(f'Error: {e}', status=status)
     except Exception as e:
         return Response(f'Error: {e}', status=500)
 
@@ -514,16 +515,42 @@ def warmup_route():
 # =========================
 @app.route('/api/instagram/proxy-image', methods=['GET'])
 def proxy_image_legacy():
-    url = request.args.get('url')
-    if not url:
+    raw = request.args.get('url', '')
+    if not raw:
         return Response('Missing URL', status=400)
-    if not (url.startswith('https://scontent') or url.startswith('https://instagram')):
+
+    # Se vier relativo, resolvemos para absoluto no mesmo host
+    # Ex.: /api/instagram/media_proxy?id=...
+    if raw.startswith('/'):
+        # só permitimos o caminho do media_proxy, nada além
+        if not raw.startswith('/api/instagram/media_proxy'):
+            return Response('Blocked path', status=403)
+        url = urljoin(request.host_url, raw)
+    else:
+        url = raw
+
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or '').lower()
+
+    # Allowlist estrita
+    allowed_hosts = {
+        'scontent.cdninstagram.com',
+        'instagram.fcpqX-1.fna.fbcdn.net',  # exemplo de POP; ajuste se quiser
+        'instagram.com',
+        'www.instagram.com',
+        request.host.lower(),  # seu próprio host: api-instagram.redbeauty.com.br
+    }
+
+    if hostname not in allowed_hosts:
         return Response('Blocked domain', status=403)
+
     try:
-        r = requests.get(url, stream=True, timeout=8)
+        r = requests.get(url, stream=True, timeout=10)
         r.raise_for_status()
         content_type = r.headers.get('Content-Type', 'image/jpeg')
-        return Response(r.content, content_type=content_type)
+        return Response(r.iter_content(chunk_size=65536),
+                        content_type=content_type,
+                        direct_passthrough=True)
     except Exception as e:
         return Response(f'Error: {e}', status=500)
 
