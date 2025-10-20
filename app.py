@@ -105,7 +105,8 @@ def fetch_user_profile():
 def _ext_from_content_type(ct: str) -> str:
     if not ct:
         return ''
-    if 'jpeg' in ct:
+    ct = ct.lower()
+    if 'jpeg' in ct or 'jpg' in ct:
         return '.jpg'
     if 'png' in ct:
         return '.png'
@@ -274,7 +275,10 @@ def handle_media_proxy(media_id: str, kind: str = "image", refresh: bool = False
         if not refresh:
             file_path, ct = ensure_media_cached(media_id, kind)
             if file_path and os.path.exists(file_path):
-                return serve_file_with_range(file_path, ct)
+                resp = serve_file_with_range(file_path, ct)
+                resp.headers['Content-Type'] = ct
+                resp.headers['Cache-Control'] = 'public, max-age=86400'
+                return resp
 
         info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
         src = _pick_src_by_kind(info, kind)
@@ -290,7 +294,11 @@ def handle_media_proxy(media_id: str, kind: str = "image", refresh: bool = False
 
         if saved_path:
             _write_meta(meta_path, ct)
-            return serve_file_with_range(saved_path, ct)
+
+            resp = serve_file_with_range(saved_path, ct)
+            resp.headers['Content-Type'] = ct
+            resp.headers['Cache-Control'] = 'public, max-age=86400'
+            return resp
 
         cdn2 = requests.get(src, stream=True, timeout=30)
         cdn2.raise_for_status()
@@ -532,11 +540,9 @@ def proxy_image_legacy():
       - Demais hosts → 403
     """
     media_id = (request.args.get('id') or '').strip()
-    raw = (request.args.get('url') or '').strip()
-
-    # 1) id direto -> serve via helper (kind=image para <img>)
+    kind_arg = (request.args.get('kind') or 'image').lower()
     if media_id:
-        return handle_media_proxy(media_id, kind='image', refresh=False)
+        return handle_media_proxy(media_id, kind=kind_arg, refresh=False)
 
     if not raw:
         return Response('Missing id or url', status=400)
@@ -561,10 +567,11 @@ def proxy_image_legacy():
     # 4) Se for seu próprio media_proxy -> extrai id e serve via helper
     if hostname == myhost and parsed.path.startswith('/api/instagram/media_proxy'):
         q = parse_qs(parsed.query)
-        mid = (q.get('id') or [''])[0]
+        mid  = (q.get('id') or [''])[0]
+        kind = (q.get('kind') or ['image'])[0].lower()  # << pega o kind passado
         if not mid:
             return Response('Missing id', status=400)
-        return handle_media_proxy(mid, kind='image', refresh=False)
+        return handle_media_proxy(mid, kind=kind, refresh=False)
 
     # 5) Caso contrário: IG/CDN -> proxy simples
     try:
