@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: instagram-api
 resources:
   - namespace.yaml
-  - secret-instagram.yaml
   - configmap.yaml
   - deployment.yaml
   - service.yaml
