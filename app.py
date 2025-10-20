@@ -13,7 +13,7 @@ app = Flask(__name__, static_folder='static')
 CORS(app)
 
 # =========================
-# Config
+# Config Rafael API
 # =========================
 ACCESS_TOKEN = os.getenv('INSTAGRAM_ACCESS_TOKEN')
 USER_ID = os.getenv('INSTAGRAM_BUSINESS_ACCOUNT_ID')
