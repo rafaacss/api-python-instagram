@@ -571,6 +571,9 @@ def allowed_file(filename):
 def serve_instagram_static(filename):
     return send_from_directory('static/instagram', filename)
 
+@app.route('/health')
+def health():
+    return {'status': 'ok'}, 200
 
 @app.route('/static/instagramm/<filename>')
 def serve_static_instagram(filename):
