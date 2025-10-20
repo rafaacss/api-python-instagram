@@ -37,7 +37,9 @@ jobs:
       - name: ✅ Verificar conexão
         run: |
           kubectl config view --minify
-          kubectl get nodes
+          echo "✅ Conectado ao cluster!"
+          kubectl get ns instagram-api
+          
 
       - name: 🧱 Namespace
         run: |
