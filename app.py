@@ -266,14 +266,10 @@ def get_user_profile_route():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/instagram/media_proxy', methods=['GET'])
-def media_proxy():
-    media_id = request.args.get('id')
-    kind = (request.args.get('kind') or 'image').lower()  # image|video|thumbnail
+def handle_media_proxy(media_id: str, kind: str = "image", refresh: bool = False):
     if not media_id:
         return Response('Missing id', status=400)
 
-    refresh = request.args.get('refresh') == '1'
     try:
         if not refresh:
             file_path, ct = ensure_media_cached(media_id, kind)
@@ -309,12 +305,19 @@ def media_proxy():
             details = e.response.json()
         except Exception:
             details = getattr(e.response, 'text', '')
-        print(f"[media_proxy] upstream error media_id={media_id} status={status} details={details}")
+        print(f"[media_proxy] upstream error media_id={media_id} kind={kind} status={status} details={details}")
         return jsonify({"error": str(e), "upstream": details}), status
     except Exception as e:
-        print(f"[media_proxy] internal error media_id={media_id} err={e}")
+        print(f"[media_proxy] internal error media_id={media_id} kind={kind} err={e}")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/instagram/media_proxy', methods=['GET'])
+def media_proxy():
+    media_id = request.args.get('id')
+    kind = (request.args.get('kind') or 'image').lower()  # image|video|thumbnail
+    refresh = request.args.get('refresh') == '1'
+    return handle_media_proxy(media_id, kind, refresh)
 
 @app.route('/api/instagram/posts', methods=['GET'])
 def get_user_posts():
@@ -522,34 +525,31 @@ def warmup_route():
 @app.route('/api/instagram/proxy-image', methods=['GET'])
 def proxy_image_legacy():
     """
-    Compatibilidade mantida na MESMA URL:
-      - Se receber ?id=<media_id> → redireciona 302 para /api/instagram/media_proxy?id=<id>
-      - Se receber ?url=/api/instagram/media_proxy?id=<id> (relativa/absoluta) → extrai o id e redireciona 302
-      - Se receber URL absoluta de domínios IG/CDN → proxy simples (stream)
+    Compatibilidade na MESMA URL, sem 302:
+      - ?id=<media_id> → serve como image (thumb p/ vídeo)
+      - ?url=/api/instagram/media_proxy?id=<media_id> → extrai id e serve igual
+      - URL absoluta IG/CDN → proxy simples (stream)
       - Demais hosts → 403
     """
     media_id = (request.args.get('id') or '').strip()
     raw = (request.args.get('url') or '').strip()
 
-    # 1) Atalho: veio id direto -> redireciona pro media_proxy
+    # 1) id direto -> serve via helper (kind=image para <img>)
     if media_id:
-        return redirect(f"/api/instagram/media_proxy?id={mid}&kind=image", code=302)
+        return handle_media_proxy(media_id, kind='image', refresh=False)
 
     if not raw:
         return Response('Missing id or url', status=400)
 
     # 2) Normaliza para absoluto se vier relativo
-    if raw.startswith('/'):
-        url = urljoin(request.host_url, raw)
-    else:
-        url = raw
-
+    url = urljoin(request.host_url, raw) if raw.startswith('/') else raw
     parsed = urlparse(url)
     hostname = (parsed.hostname or '').lower()
+    myhost = request.host.split(':', 1)[0].lower()
 
     # 3) Allowlist de hosts
     allowed_hosts = {
-        request.host.split(':', 1)[0].lower(),  # seu próprio host (sem porta)
+        myhost,
         'graph.instagram.com',
         'instagram.com', 'www.instagram.com',
         'scontent.cdninstagram.com',
@@ -558,15 +558,15 @@ def proxy_image_legacy():
     if not is_allowed:
         return Response('Blocked domain', status=403)
 
-    # 4) Se for o seu próprio media_proxy -> extrai id e redireciona 302
-    if hostname == request.host.split(':', 1)[0].lower() and parsed.path.startswith('/api/instagram/media_proxy'):
+    # 4) Se for seu próprio media_proxy -> extrai id e serve via helper
+    if hostname == myhost and parsed.path.startswith('/api/instagram/media_proxy'):
         q = parse_qs(parsed.query)
         mid = (q.get('id') or [''])[0]
         if not mid:
             return Response('Missing id', status=400)
-        return redirect(f"/api/instagram/media_proxy?id={mid}&kind=image", code=302)
+        return handle_media_proxy(mid, kind='image', refresh=False)
 
-    # 5) Caso contrário: é IG/CDN -> proxy simples (stream)
+    # 5) Caso contrário: IG/CDN -> proxy simples
     try:
         r = requests.get(url, stream=True, timeout=15)
         r.raise_for_status()
