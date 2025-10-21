@@ -3,7 +3,7 @@ import time
 import mimetypes
 import argparse
 import requests
-from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response
+from flask import Flask, jsonify, request, Response, send_from_directory, abort, make_response, redirect
 from dotenv import load_dotenv
 from flask_cors import CORS
 from urllib.parse import urlparse, urljoin, parse_qs
@@ -307,7 +307,7 @@ def proxy_image_legacy():
     parsed = urlparse(url)
     host = (parsed.hostname or '').lower()
     myhost = request.host.split(':', 1)[0].lower()
-
+    print(f"[DEBUG]   - first image url: {host}")
     # Allowlist
     allowed = {
         myhost,
@@ -326,8 +326,7 @@ def proxy_image_legacy():
         if not mid:
             return tiny_png_response()
         # Chama internamente o handler
-        with app.test_request_context(f"/api/instagram/media_proxy?id={mid}&kind={k}", method='GET', headers=request.headers):
-            return media_proxy()
+        return redirect(f"/api/instagram/media_proxy?id={mid}&kind={k}", code=307)
 
     # Caso contrário, stream direto da CDN do IG
     try:
@@ -428,7 +427,7 @@ def get_user_posts():
                     images.append({"url": cover_url(cmid)})
 
             # Fallback: nunca deixe vazio para não quebrar o instashow
-           if not images:
+            if not images:
                placeholder_url = "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"
                images = [{"url": placeholder_url}]
                if not media_items:
@@ -554,6 +553,19 @@ def cli_warmup(limit: int, force: bool):
         print(f"WARMUP => cached={count}")
     except Exception as e:
         print("WARMUP ERROR:", e)
+
+@app.route('/')
+def index():
+    return jsonify({
+        "ok": True,
+        "endpoints": [
+            "/health",
+            "/api/instagram/posts",
+            "/api/instagram/media_proxy?id=<id>&kind=image|video|thumbnail",
+            "/api/instagram/proxy-image?url=/api/instagram/media_proxy?id=<id>&kind=image",
+            "/static/instagram/<file>"
+        ]
+    })
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Instagram API proxy com cache")
