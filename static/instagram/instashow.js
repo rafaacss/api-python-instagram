@@ -9841,7 +9841,7 @@
                     })
                 }
                 proxyImg(e) {
-                    return `https://api-instagram.redbeauty.com.br/api/instagram/proxy-image?url=${encodeURIComponent(e)}`
+                    return `https://api-instagram.redbeauty.com.br?url=${e}`
                 }
                 isNullish(e) {
                     return void 0 === e || null === e
