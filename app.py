@@ -328,7 +328,7 @@ def proxy_image_legacy():
         if not mid:
             return tiny_png_response()
         # Chama internamente o handler
-        return redirect(f"/api/instagram/media_proxy?id={mid}&kind={k}", code=307)
+        return redirect(f"/api/instagram/media_proxy?id={mid}", code=307)
 
     # Caso contrário, stream direto da CDN do IG
     try:
