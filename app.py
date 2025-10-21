@@ -64,6 +64,24 @@ def tiny_png_response(max_age=300):
     return r
 
 # =========================================
+# Helpers para URL Generation
+# =========================================
+def generate_proxy_image_url(media_id: str, kind: str = "image") -> str:
+    """
+    Gera URL corretamente encodada para proxy-image.
+
+    Uso recomendado em templates/frontend:
+      <img src="{{ generate_proxy_image_url('123456', 'image') }}" />
+
+    Retorna:
+      /api/instagram/proxy-image?url=%2Fapi%2Finstagram%2Fmedia_proxy%3Fid%3D123456%26kind%3Dimage
+    """
+    from urllib.parse import quote
+    inner_url = f"/api/instagram/media_proxy?id={media_id}&kind={kind}"
+    encoded = quote(inner_url, safe='')
+    return f"/api/instagram/proxy-image?url={encoded}"
+
+# =========================================
 # Helpers de cache JSON
 # =========================================
 def get_from_cache(key: str):
@@ -345,102 +363,171 @@ def media_proxy():
     media_id = (request.args.get('id') or '').strip()
     kind = (request.args.get('kind') or 'image').lower()
 
-    logger.info(f"[media_proxy] id={media_id} kind={kind}")
+    logger.info(f"[media_proxy] START | id={media_id} | kind={kind}")
 
     if not media_id:
-        logger.warning("[media_proxy] ID vazio")
+        logger.warning("[media_proxy] ❌ ID vazio")
         return tiny_png_response()
 
     try:
+        # Validar que o token está configurado
+        if not ACCESS_TOKEN:
+            logger.error("[media_proxy] ❌ INSTAGRAM_ACCESS_TOKEN não configurado!")
+            return tiny_png_response()
+
+        logger.info(f"[media_proxy] Garantindo cache para: {media_id}")
         file_path, ct = ensure_media_cached(media_id, kind)
+
         if file_path and os.path.exists(file_path):
+            logger.info(f"[media_proxy] ✓ Servindo arquivo: {file_path} | ct={ct}")
             return serve_file_with_range(file_path, ct)
-        logger.warning(f"[media_proxy] Arquivo não encontrado: {file_path}")
+
+        logger.warning(f"[media_proxy] ❌ Arquivo não encontrado: {file_path}")
         return tiny_png_response()
+
     except requests.exceptions.RequestException as e:
         status = getattr(e.response, 'status_code', 500) if hasattr(e, 'response') else 500
-        logger.error(f"[media_proxy] upstream error: status={status} err={e}")
+        logger.error(f"[media_proxy] ❌ Upstream error: status={status} | err={e}", exc_info=True)
         return tiny_png_response()
     except Exception as e:
-        logger.error(f"[media_proxy] internal error: {e}")
+        logger.error(f"[media_proxy] ❌ Internal error: {e}", exc_info=True)
         return tiny_png_response()
 
 @app.route('/api/instagram/proxy-image', methods=['GET', 'OPTIONS'])
 def proxy_image_legacy():
     """
     Mantém compatibilidade com URLs antigas.
-    Aceita:
-      - ?id=<media_id>&kind=image|video|thumbnail
-      - ?url=/api/instagram/media_proxy?id=...
-      - ?url=<absoluta IG/CDN>
-      - undefined/null → PNG minúsculo (200)
+
+    Aceita múltiplos formatos:
+      1. ?id=<media_id>&kind=image|video|thumbnail (RECOMENDADO)
+      2. ?url=/api/instagram/media_proxy?id=...&kind=... (URL encoding necessário!)
+      3. ?url=<absoluta IG/CDN>
+      4. undefined/null → PNG minúsculo (200)
+
+    IMPORTANTE: Se receber ?url=/api/instagram/media_proxy&id=X&kind=Y
+    (parâmetros desmembrados), reconstrói a URL interna.
     """
     if request.method == 'OPTIONS':
         return '', 204
 
-    # Caminho preferido: com id/kind
-    mid = (request.args.get('id') or '').strip()
-    kind = (request.args.get('kind') or 'image').lower()
-    if mid:
-        return media_proxy()
-
-    raw = (request.args.get('url') or '').strip()
-    logger.debug(f"[proxy-image] raw url: {raw[:100] if raw else 'empty'}")
-
-    if not raw or raw in ('undefined', 'null', 'None'):
-        return tiny_png_response()
-
-    # Decodificar se necessário
     try:
-        raw = unquote(raw)
-    except Exception:
-        pass
+        # ==========================================
+        # PASSO 1: Verificar se vem com id/kind direto
+        # ==========================================
+        mid = (request.args.get('id') or '').strip()
+        kind = (request.args.get('kind') or 'image').lower()
+        raw_url = (request.args.get('url') or '').strip()
 
-    # Normalizar URL
-    url = urljoin(request.host_url, raw) if raw.startswith('/') else raw
-    parsed = urlparse(url)
-    host = (parsed.hostname or '').lower()
-    myhost = request.host.split(':', 1)[0].lower()
+        logger.info(f"[proxy-image] START")
+        logger.info(f"  - id param: {mid}")
+        logger.info(f"  - kind param: {kind}")
+        logger.info(f"  - url param: {raw_url[:80] if raw_url else 'NONE'}")
 
-    logger.debug(f"[proxy-image] host={host} myhost={myhost}")
+        # ==========================================
+        # PASSO 2: Detectar URL desmembrada
+        # ==========================================
+        # Se recebeu ?url=/api/instagram/media_proxy&id=X&kind=Y
+        # (parâmetros separados), reconstrói a URL interna
+        if (raw_url and '/api/instagram/media_proxy' in raw_url and
+            ('id' in request.args or 'kind' in request.args)):
 
-    # Allowlist de hosts permitidos
-    allowed = {
-        myhost,
-        'graph.instagram.com',
-        'instagram.com', 'www.instagram.com',
-        'scontent.cdninstagram.com',
-    }
+            logger.info(f"[proxy-image] ✓ Detectado formato desmembrado!")
+            logger.info(f"  - Reconstruindo URL interna com id={mid} kind={kind}")
 
-    is_allowed = (host in allowed or host.endswith('fna.fbcdn.net'))
-    if not is_allowed:
-        logger.warning(f"[proxy-image] Host não permitido: {host}")
-        return tiny_png_response()
+            # Se ambos vêm como parâmetros top-level, use media_proxy direto
+            if mid:
+                with app.test_request_context(f"/api/instagram/media_proxy?id={mid}&kind={kind}", method='GET', headers=request.headers):
+                    return media_proxy()
 
-    # Se for seu próprio media_proxy → delega internamente
-    if host == myhost and parsed.path.startswith('/api/instagram/media_proxy'):
-        logger.debug("[proxy-image] Delegando para media_proxy interno")
-        q = parse_qs(parsed.query)
-        mid = (q.get('id') or [''])[0].strip()
-        k = (q.get('kind') or ['image'])[0].strip()
-        if not mid:
-            return tiny_png_response()
-        with app.test_request_context(f"/api/instagram/media_proxy?id={mid}&kind={k}", method='GET', headers=request.headers):
+        # ==========================================
+        # PASSO 3: Se vem com id/kind direto (sem url)
+        # ==========================================
+        if mid and not raw_url:
+            logger.info(f"[proxy-image] ✓ Usando id direto, delegando para media_proxy")
             return media_proxy()
 
-    # Stream direto da CDN
-    logger.info(f"[proxy-image] Streamando: {url[:100]}...")
-    try:
-        r = requests.get(url, stream=True, timeout=REQUEST_TIMEOUT)
-        r.raise_for_status()
-        return Response(
-            r.iter_content(chunk_size=64 * 1024),
-            content_type=r.headers.get('Content-Type', 'image/jpeg'),
-            direct_passthrough=True,
-            headers={'Cache-Control': 'public, max-age=86400'}
-        )
+        # ==========================================
+        # PASSO 4: Processar parâmetro url
+        # ==========================================
+        if not raw_url or raw_url in ('undefined', 'null', 'None'):
+            logger.warning("[proxy-image] ❌ URL vazia ou undefined")
+            return tiny_png_response()
+
+        # Decodificar URL se necessário
+        try:
+            decoded = unquote(raw_url)
+            if decoded != raw_url:
+                logger.info(f"[proxy-image] URL decodificada: {decoded[:80]}")
+            raw_url = decoded
+        except Exception as e:
+            logger.warning(f"[proxy-image] Erro ao decodificar URL: {e}")
+
+        # Normalizar URL
+        url = urljoin(request.host_url, raw_url) if raw_url.startswith('/') else raw_url
+        logger.info(f"[proxy-image] URL normalizada: {url[:100]}")
+
+        parsed = urlparse(url)
+        host = (parsed.hostname or '').lower()
+        myhost = request.host.split(':', 1)[0].lower()
+
+        logger.info(f"[proxy-image] HOST CHECK | host={host} | myhost={myhost}")
+
+        # ==========================================
+        # PASSO 5: Validar host (allowlist)
+        # ==========================================
+        allowed = {
+            myhost,
+            'graph.instagram.com',
+            'instagram.com', 'www.instagram.com',
+            'scontent.cdninstagram.com',
+        }
+
+        is_allowed = (host in allowed or host.endswith('fna.fbcdn.net'))
+        if not is_allowed:
+            logger.warning(f"[proxy-image] ❌ Host não permitido: {host}")
+            return tiny_png_response()
+
+        # ==========================================
+        # PASSO 6: Se for media_proxy interno → delega
+        # ==========================================
+        if host == myhost and '/api/instagram/media_proxy' in parsed.path:
+            logger.info("[proxy-image] ✓ Detectado media_proxy interno, extraindo parâmetros...")
+            try:
+                q = parse_qs(parsed.query)
+                logger.debug(f"[proxy-image] Query parsed: {q}")
+                mid = (q.get('id') or [''])[0].strip()
+                k = (q.get('kind') or ['image'])[0].strip()
+                logger.info(f"[proxy-image] Extraído | mid={mid} | kind={k}")
+                if not mid:
+                    logger.warning("[proxy-image] Media ID vazio após extração")
+                    return tiny_png_response()
+                with app.test_request_context(f"/api/instagram/media_proxy?id={mid}&kind={k}", method='GET', headers=request.headers):
+                    return media_proxy()
+            except Exception as e:
+                logger.error(f"[proxy-image] ❌ Erro ao processar media_proxy interno: {e}", exc_info=True)
+                return tiny_png_response()
+
+        # ==========================================
+        # PASSO 7: Stream direto da CDN
+        # ==========================================
+        logger.info(f"[proxy-image] → Streamando direto da CDN: {url[:80]}...")
+        try:
+            r = requests.get(url, stream=True, timeout=REQUEST_TIMEOUT)
+            r.raise_for_status()
+            ct = r.headers.get('Content-Type', 'image/jpeg')
+            logger.info(f"[proxy-image] ✓ CDN stream OK | content-type={ct}")
+            return Response(
+                r.iter_content(chunk_size=64 * 1024),
+                content_type=ct,
+                direct_passthrough=True,
+                headers={'Cache-Control': 'public, max-age=86400'}
+            )
+        except Exception as e:
+            logger.error(f"[proxy-image] ❌ Erro CDN stream: {e}", exc_info=True)
+            return tiny_png_response()
+
     except Exception as e:
-        logger.error(f"[proxy-image] error url={url[:100]}... err={e}")
+        logger.error(f"[proxy-image] ❌ Erro geral: {e}", exc_info=True)
         return tiny_png_response()
 
 @app.route('/api/instagram/posts', methods=['GET', 'OPTIONS'])
@@ -612,12 +699,37 @@ def serve_instagram_static(filename):
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check"""
-    return jsonify({
+    """Health check com informações de debug"""
+    checks = {
         'status': 'ok',
         'cache_dir_exists': os.path.exists(MEDIA_CACHE_DIR),
-        'token_configured': bool(ACCESS_TOKEN)
-    }), 200
+        'cache_dir_writable': os.access(MEDIA_CACHE_DIR, os.W_OK) if os.path.exists(MEDIA_CACHE_DIR) else False,
+        'token_configured': bool(ACCESS_TOKEN),
+        'token_length': len(ACCESS_TOKEN) if ACCESS_TOKEN else 0,
+        'graph_api_url': GRAPH_API_URL,
+        'cache_dir': MEDIA_CACHE_DIR,
+        'request_timeout_seconds': REQUEST_TIMEOUT
+    }
+
+    # Tentar conexão com Instagram
+    if ACCESS_TOKEN:
+        try:
+            r = requests.get(
+                f"{GRAPH_API_URL}/me",
+                params={"fields": "id", "access_token": ACCESS_TOKEN},
+                timeout=5
+            )
+            checks['instagram_api_ok'] = r.status_code == 200
+            if r.status_code != 200:
+                checks['instagram_error'] = f"Status {r.status_code}"
+        except Exception as e:
+            checks['instagram_api_ok'] = False
+            checks['instagram_error'] = str(e)
+    else:
+        checks['instagram_api_ok'] = False
+        checks['instagram_error'] = "Token não configurado"
+
+    return jsonify(checks), 200
 
 @app.route('/api/instagram/clear-cache', methods=['POST', 'GET'])
 def clear_cache():
@@ -686,6 +798,43 @@ def cache_status():
             "ttl_seconds": MEDIA_CACHE_TTL_SECONDS,
             "max_size_mb": MEDIA_CACHE_MAX_BYTES / (1024 * 1024),
             "files": media_files[:10]
+        }
+    }), 200
+
+@app.route('/api/instagram/url-examples', methods=['GET'])
+def url_examples():
+    """
+    Mostra exemplos de URLs corretas para usar no frontend.
+
+    ✓ Use a primeira opção (mais simples)
+    ⚠ Evite a segunda opção (parsing complexo)
+    """
+    media_id = request.args.get('id', '17886774234352278')
+    kind = request.args.get('kind', 'image')
+
+    from urllib.parse import quote
+    inner_url = f"/api/instagram/media_proxy?id={media_id}&kind={kind}"
+    encoded_inner = quote(inner_url, safe='')
+
+    return jsonify({
+        "media_id": media_id,
+        "kind": kind,
+        "examples": {
+            "✓ RECOMENDADO_1": {
+                "description": "Chama diretamente media_proxy (mais rápido)",
+                "url": f"/api/instagram/media_proxy?id={media_id}&kind={kind}",
+                "use_case": "Use em <img src=\"...\" /> tags"
+            },
+            "✓ RECOMENDADO_2": {
+                "description": "Via proxy-image com URL encoding correto",
+                "url": f"/api/instagram/proxy-image?url={encoded_inner}",
+                "use_case": "Use se precisar passar por proxy-image"
+            },
+            "❌ NÃO RECOMENDADO": {
+                "description": "Dupla interrogação (causa parsing incorreto)",
+                "url": f"/api/instagram/proxy-image?url=/api/instagram/media_proxy?id={media_id}&kind={kind}",
+                "problem": "O ? interno quebra o parsing de query strings"
+            }
         }
     }), 200
 
