@@ -6,6 +6,109 @@
 </head>
 <body>
 <div class="elfsight-app-redbeauty eapps-instagram-feed es-widget eapps-widget"></div>
+<script>
+    /**
+     * Domínio/rota da API que devolve o payload (ajuste se necessário).
+     * Use uma parte estável da URL que aparece no DevTools (ex.: "posts?v=").
+     */
+    const INSTAFEED_API_MATCH = /\/posts\?/i;
+
+    /**
+     * Função que corrige a estrutura do payload.
+     * Se a API trouxer `images: [{ url }]` ou `image: "..."`,
+     * garantimos sempre `image.url` e também expomos `imageUrl`.
+     */
+    function normalizeInstagramPayload(data) {
+        if (!data || !Array.isArray(data.payload)) return data;
+
+        data.payload = data.payload.map(p => {
+            const imageUrl = p?.images?.[0]?.url || p?.image || '';
+            const imageObj = typeof p.image === 'string' ? { url: p.image } : (p.image || {});
+            return {
+                ...p,
+                imageUrl,
+                image: { url: imageUrl, ...imageObj } // garante que p.image.url exista
+            };
+        });
+
+        return data;
+    }
+
+    /**
+     * Hook público — se o instashow.js checar por algo do tipo,
+     * já devolvemos os dados normalizados.
+     */
+    window.eappsInstagramFeedPrepareData = normalizeInstagramPayload;
+
+    /* ------------ Interceptores (fetch + XHR) ------------ */
+    /* Intercepta fetch() e normaliza o JSON quando a URL bater com a API. */
+    (function patchFetch() {
+        if (!window.fetch) return;
+        const _fetch = window.fetch;
+        window.fetch = function(input, init) {
+            try {
+                const url = typeof input === 'string' ? input : (input?.url || '');
+                const looksLikeApi = INSTAFEED_API_MATCH.test(url);
+                if (!looksLikeApi) return _fetch(input, init);
+
+                return _fetch(input, init).then(async resp => {
+                    // clonamos pra não quebrar o fluxo do instashow
+                    const clone = resp.clone();
+                    try {
+                        const data = await clone.json();
+                        const fixed = normalizeInstagramPayload(data);
+
+                        // devolvemos uma nova Response com o corpo corrigido
+                        return new Response(
+                            JSON.stringify(fixed),
+                            {
+                                status: resp.status,
+                                statusText: resp.statusText,
+                                headers: resp.headers
+                            }
+                        );
+                    } catch (_) {
+                        // se falhar, volta a resposta original
+                        return resp;
+                    }
+                });
+            } catch (_) {
+                return _fetch(input, init);
+            }
+        };
+    })();
+
+    /* Intercepta XMLHttpRequest (caso o script use XHR em vez de fetch). */
+    (function patchXHR() {
+        const _open = XMLHttpRequest.prototype.open;
+        const _send = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            this.__isInsta = typeof url === 'string' && INSTAFEED_API_MATCH.test(url);
+            return _open.call(this, method, url, ...rest);
+        };
+
+        XMLHttpRequest.prototype.send = function(...args) {
+            if (!this.__isInsta) return _send.apply(this, args);
+
+            const _onreadystatechange = this.onreadystatechange;
+            this.onreadystatechange = () => {
+                try {
+                    if (this.readyState === 4 && this.status === 200 && this.responseText) {
+                        const data = JSON.parse(this.responseText);
+                        const fixed = normalizeInstagramPayload(data);
+                        // sobrescreve getters para refletir o JSON corrigido
+                        Object.defineProperty(this, 'response', { value: JSON.stringify(fixed) });
+                        Object.defineProperty(this, 'responseText', { value: JSON.stringify(fixed) });
+                    }
+                } catch (_) {}
+                if (typeof _onreadystatechange === 'function') _onreadystatechange.call(this);
+            };
+
+            return _send.apply(this, args);
+        };
+    })();
+</script>
 <script src="instagram.js"></script>
 </body>
 </html>
