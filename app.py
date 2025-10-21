@@ -379,6 +379,9 @@ def get_user_posts():
             ptype = (post.get("media_type") or "").upper()
             pid = post.get("id")
 
+            if not pid:
+                continue
+
             # monta media_items (compatibilidade com seu front atual)
             media_items = []
             images = []
@@ -405,6 +408,8 @@ def get_user_posts():
             elif ptype == "CAROUSEL_ALBUM":
                 for child in (post.get("children") or {}).get("data", []):
                     cmid = child.get("id")
+                    if not cmid:
+                        continue
                     ctype = (child.get("media_type") or "").upper()
                     media_items.append({
                         "type": ctype.lower(),
@@ -423,8 +428,20 @@ def get_user_posts():
                     images.append({"url": cover_url(cmid)})
 
             # Fallback: nunca deixe vazio para não quebrar o instashow
-            if not images:
-                images = [{"url": "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"}]
+           if not images:
+               placeholder_url = "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"
+               images = [{"url": placeholder_url}]
+               if not media_items:
+                   media_items.append({
+                       "type": "image",
+                       "url": placeholder_url,
+                       "cover": {
+                           "thumbnail": {"url": placeholder_url, "width": 1080.0, "height": 1920.0},
+                           "standard": None,
+                           "original": None
+                       },
+                       "id": "placeholder"
+                   })
 
             formatted_post = {
                 "vendorId": pid,
@@ -444,7 +461,7 @@ def get_user_posts():
                 },
                 "media": media_items,
                 "images": images,                 # <== chave usada pelo instashow na MODAL
-                "image": images[0]["url"],        # <== alias comum
+                "image": images[0]["url"] if images else "",
                 "comments": [],
                 "caption": post.get("caption"),
                 "commentsCount": None,
@@ -453,6 +470,13 @@ def get_user_posts():
                 "isPinned": None
             }
             formatted_posts.append(formatted_post)
+
+        print(f"[DEBUG] Retornando {len(formatted_posts)} posts")
+        for idx, post in enumerate(formatted_posts[:3]):  # Primeiros 3 posts
+            print(f"[DEBUG] Post {idx}: {post.get('vendorId')}")
+            print(f"[DEBUG]   - images count: {len(post.get('images', []))}")
+            if post.get('images'):
+                print(f"[DEBUG]   - first image url: {post['images'][0].get('url')}")
 
         final_response = {"code": 200, "payload": formatted_posts}
         set_in_cache(cache_key, final_response)
