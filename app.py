@@ -379,7 +379,7 @@ def get_user_posts():
             ptype = (post.get("media_type") or "").upper()
             pid = post.get("id")
 
-            if not pid:
+            if not pid:  # Pula posts sem ID
                 continue
 
             # monta media_items (compatibilidade com seu front atual)
@@ -388,12 +388,14 @@ def get_user_posts():
 
             if ptype in ("IMAGE", "VIDEO"):
                 mid = pid
+                media_url = cover_url(mid)
+
                 media_items.append({
                     "type": ptype.lower(),
-                    "url": cover_url(mid),  # para <img> é melhor entregar imagem
+                    "url": media_url,
                     "cover": {
                         "thumbnail": {
-                            "url": cover_url(mid),
+                            "url": media_url,
                             "width": 1080.0,
                             "height": 1920.0
                         },
@@ -403,20 +405,23 @@ def get_user_posts():
                     "id": mid
                 })
                 # **IMPORTANTE**: array "images" que o instashow usa na MODAL
-                images.append({"url": cover_url(mid)})
+                images.append({"url": media_url})
 
             elif ptype == "CAROUSEL_ALBUM":
                 for child in (post.get("children") or {}).get("data", []):
                     cmid = child.get("id")
-                    if not cmid:
+                    if not cmid:  # Pula children sem ID
                         continue
+
                     ctype = (child.get("media_type") or "").upper()
+                    child_url = cover_url(cmid)
+
                     media_items.append({
                         "type": ctype.lower(),
-                        "url": cover_url(cmid),
+                        "url": child_url,
                         "cover": {
                             "thumbnail": {
-                                "url": cover_url(cmid),
+                                "url": child_url,
                                 "width": 1080.0,
                                 "height": 1920.0
                             },
@@ -425,23 +430,27 @@ def get_user_posts():
                         },
                         "id": cmid
                     })
-                    images.append({"url": cover_url(cmid)})
+                    images.append({"url": child_url})
 
             # Fallback: nunca deixe vazio para não quebrar o instashow
-           if not images:
-               placeholder_url = "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"
-               images = [{"url": placeholder_url}]
-               if not media_items:
-                   media_items.append({
-                       "type": "image",
-                       "url": placeholder_url,
-                       "cover": {
-                           "thumbnail": {"url": placeholder_url, "width": 1080.0, "height": 1920.0},
-                           "standard": None,
-                           "original": None
-                       },
-                       "id": "placeholder"
-                   })
+            if not images:
+                placeholder_url = "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"
+                images = [{"url": placeholder_url}]
+                if not media_items:
+                    media_items.append({
+                        "type": "image",
+                        "url": placeholder_url,
+                        "cover": {
+                            "thumbnail": {
+                                "url": placeholder_url,
+                                "width": 1080.0,
+                                "height": 1920.0
+                            },
+                            "standard": None,
+                            "original": None
+                        },
+                        "id": "placeholder"
+                    })
 
             formatted_post = {
                 "vendorId": pid,
@@ -461,7 +470,7 @@ def get_user_posts():
                 },
                 "media": media_items,
                 "images": images,                 # <== chave usada pelo instashow na MODAL
-                "image": images[0]["url"] if images else "",
+                "image": images[0]["url"] if images else "",  # <== alias comum
                 "comments": [],
                 "caption": post.get("caption"),
                 "commentsCount": None,
@@ -471,6 +480,7 @@ def get_user_posts():
             }
             formatted_posts.append(formatted_post)
 
+        # Debug log
         print(f"[DEBUG] Retornando {len(formatted_posts)} posts")
         for idx, post in enumerate(formatted_posts[:3]):  # Primeiros 3 posts
             print(f"[DEBUG] Post {idx}: {post.get('vendorId')}")
@@ -532,6 +542,47 @@ def clear_cache():
         "message": "Cache limpo com sucesso",
         "json_cache_cleared": cache_size,
         "media_files_deleted": media_files_deleted
+    }), 200
+
+
+@app.route('/api/instagram/cache-status', methods=['GET'])
+def cache_status():
+    """Mostra o status atual do cache"""
+
+    # Cache JSON
+    cache_keys = list(api_cache.keys())
+
+    # Cache de mídia
+    media_files = []
+    media_total_size = 0
+    if os.path.exists(MEDIA_CACHE_DIR):
+        for filename in os.listdir(MEDIA_CACHE_DIR):
+            file_path = os.path.join(MEDIA_CACHE_DIR, filename)
+            if os.path.isfile(file_path):
+                size = os.path.getsize(file_path)
+                age_seconds = time.time() - os.path.getmtime(file_path)
+                media_files.append({
+                    "filename": filename,
+                    "size_bytes": size,
+                    "age_seconds": int(age_seconds),
+                    "is_fresh": age_seconds <= MEDIA_CACHE_TTL_SECONDS
+                })
+                media_total_size += size
+
+    return jsonify({
+        "json_cache": {
+            "keys": cache_keys,
+            "count": len(cache_keys),
+            "ttl_seconds": CACHE_DURATION_SECONDS
+        },
+        "media_cache": {
+            "files_count": len(media_files),
+            "total_size_bytes": media_total_size,
+            "total_size_mb": round(media_total_size / (1024 * 1024), 2),
+            "ttl_seconds": MEDIA_CACHE_TTL_SECONDS,
+            "max_size_mb": MEDIA_CACHE_MAX_BYTES / (1024 * 1024),
+            "files": media_files[:10]  # Primeiros 10 arquivos
+        }
     }), 200
 
 # =========================================
