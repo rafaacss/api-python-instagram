@@ -170,42 +170,47 @@ def _save_stream_to_file(resp: requests.Response, dst_path: str, max_bytes: int,
     tmp_path = dst_path + ".tmp"
     total = 0
     try:
+        logger.debug(f"[_save_stream_to_file] Iniciando save para {dst_path}")
         with open(tmp_path, 'wb') as f:
             for chunk in resp.iter_content(chunk_size=64 * 1024):
                 if not chunk:
                     continue
                 total += len(chunk)
                 if total > max_bytes:
-                    logger.warning(f"Arquivo excedeu limite: {total} > {max_bytes}")
+                    logger.error(f"❌ Arquivo excedeu limite: {total} > {max_bytes}")
                     f.close()
                     os.remove(tmp_path)
                     return ''
                 f.write(chunk)
 
-        # Validar Content-Length se existir
+        logger.debug(f"[_save_stream_to_file] Download completo: {total} bytes")
+
+        # Validar Content-Length
         cl = resp.headers.get('Content-Length')
         if cl is not None:
             try:
                 cl = int(cl)
                 if cl > 0 and total != cl:
-                    logger.warning(f"Content-Length mismatch: {total} != {cl}")
+                    logger.error(f"❌ Content-Length mismatch: recebido={total}, header={cl}")
                     os.remove(tmp_path)
                     return ''
             except Exception as e:
-                logger.warning(f"Erro ao validar Content-Length: {e}")
+                logger.debug(f"Erro ao validar Content-Length: {e}")
 
         if total < min_bytes:
-            logger.warning(f"Arquivo muito pequeno: {total} < {min_bytes}")
+            logger.error(f"❌ Arquivo muito pequeno: {total} < {min_bytes}")
             os.remove(tmp_path)
             return ''
 
         if os.path.exists(dst_path):
+            logger.debug(f"Removendo arquivo anterior: {dst_path}")
             os.remove(dst_path)
+
         os.rename(tmp_path, dst_path)
-        logger.info(f"✓ Arquivo cacheado: {dst_path} ({total} bytes)")
+        logger.info(f"✓ Arquivo salvo: {dst_path} ({total} bytes)")
         return dst_path
     except Exception as e:
-        logger.error(f"Erro ao salvar stream: {e}")
+        logger.error(f"❌ Erro ao salvar stream: {e}", exc_info=True)
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
@@ -310,7 +315,7 @@ def _pick_src_by_kind(info: dict, kind: str) -> str:
 def ensure_media_cached(media_id: str, kind: str = "image") -> tuple[str, str]:
     """Garante mídia em cache; retorna (file_path, content_type)"""
     if not media_id or not media_id.strip():
-        logger.warning("Media ID vazio")
+        logger.warning("❌ Media ID vazio")
         return '', ''
 
     media_id = media_id.strip()
@@ -318,34 +323,62 @@ def ensure_media_cached(media_id: str, kind: str = "image") -> tuple[str, str]:
 
     # Verificar se já está em cache e fresco
     if os.path.exists(existing_file) and _is_cache_fresh(existing_file):
-        logger.info(f"✓ Cache hit: {media_id}-{kind}")
-        return existing_file, _read_meta(existing_meta)
+        ct = _read_meta(existing_meta)
+        logger.info(f"✓ Cache HIT: {media_id}-{kind} | file={existing_file} | ct={ct}")
+        return existing_file, ct
 
-    logger.info(f"→ Buscando mídia: {media_id}-{kind}")
+    logger.info(f"→ CACHE MISS: Buscando mídia {media_id}-{kind}")
 
     try:
-        info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
-        src = _pick_src_by_kind(info, kind)
-
-        if not src:
-            logger.warning(f"Nenhuma URL disponível para {media_id}")
+        if not ACCESS_TOKEN:
+            logger.error(f"❌ ACCESS_TOKEN não configurado!")
             return '', ''
 
-        logger.debug(f"[ensure_media_cached] Downloading from: {src[:100]}...")
+        logger.debug(f"[ensure_media_cached] Buscando info do IG para {media_id}")
+        info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
+        logger.debug(f"[ensure_media_cached] Info recebido: {info}")
+
+        src = _pick_src_by_kind(info, kind)
+        logger.info(f"[ensure_media_cached] URL selecionada (kind={kind}): {src[:80] if src else 'VAZIA'}")
+
+        if not src:
+            logger.warning(f"❌ Nenhuma URL disponível para {media_id} (kind={kind})")
+            logger.warning(f"   media_type={info.get('media_type')}")
+            logger.warning(f"   media_url={info.get('media_url', '')[:80]}")
+            logger.warning(f"   thumbnail_url={info.get('thumbnail_url', '')[:80]}")
+            return '', ''
+
+        logger.info(f"[ensure_media_cached] Iniciando download de: {src[:80]}...")
 
         with requests.get(src, stream=True, timeout=REQUEST_TIMEOUT) as cdn:
             cdn.raise_for_status()
             ct = cdn.headers.get('Content-Type', 'application/octet-stream')
+            content_length = cdn.headers.get('Content-Length', 'unknown')
+            logger.info(f"[ensure_media_cached] Status={cdn.status_code} | CT={ct} | CL={content_length}")
+
             file_path, meta_path = _cache_paths(media_id, ct, kind)
+            logger.info(f"[ensure_media_cached] Cache path: {file_path}")
+
             saved_path = _save_stream_to_file(cdn, file_path, MEDIA_CACHE_MAX_BYTES)
 
         if saved_path:
             _write_meta(meta_path, ct)
             os.utime(saved_path, None)
+            file_size = os.path.getsize(saved_path)
+            logger.info(f"✓ Arquivo cacheado com sucesso: {saved_path} ({file_size} bytes)")
             return saved_path, ct
+        else:
+            logger.error(f"❌ Falha ao salvar arquivo")
+            return '', ''
+
+    except requests.exceptions.RequestException as e:
+        status_code = e.response.status_code if hasattr(e, 'response') and e.response else 'unknown'
+        logger.error(f"❌ Erro de request IG: status={status_code} | {e}", exc_info=True)
         return '', ''
     except Exception as e:
-        logger.error(f"Erro ao cachear mídia {media_id}: {e}")
+        logger.error(f"❌ Erro ao cachear mídia {media_id}: {e}", exc_info=True)
+        import traceback
+        logger.error(traceback.format_exc())
         return '', ''
 
 # =========================================
@@ -363,10 +396,14 @@ def media_proxy():
     media_id = (request.args.get('id') or '').strip()
     kind = (request.args.get('kind') or 'image').lower()
 
-    logger.info(f"[media_proxy] START | id={media_id} | kind={kind}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"[media_proxy] NOVA REQUISIÇÃO")
+    logger.info(f"  media_id: {media_id}")
+    logger.info(f"  kind: {kind}")
+    logger.info(f"{'='*60}")
 
     if not media_id:
-        logger.warning("[media_proxy] ❌ ID vazio")
+        logger.error("[media_proxy] ❌ ID vazio!")
         return tiny_png_response()
 
     try:
@@ -375,22 +412,27 @@ def media_proxy():
             logger.error("[media_proxy] ❌ INSTAGRAM_ACCESS_TOKEN não configurado!")
             return tiny_png_response()
 
-        logger.info(f"[media_proxy] Garantindo cache para: {media_id}")
+        logger.info(f"[media_proxy] → Iniciando ensure_media_cached...")
         file_path, ct = ensure_media_cached(media_id, kind)
 
+        logger.info(f"[media_proxy] Resultado: file_path={file_path}, ct={ct}")
+
         if file_path and os.path.exists(file_path):
-            logger.info(f"[media_proxy] ✓ Servindo arquivo: {file_path} | ct={ct}")
+            logger.info(f"[media_proxy] ✓ Arquivo existe, servindo...")
             return serve_file_with_range(file_path, ct)
 
-        logger.warning(f"[media_proxy] ❌ Arquivo não encontrado: {file_path}")
+        logger.error(f"[media_proxy] ❌ Arquivo não encontrado: {file_path}")
+        logger.error(f"[media_proxy] Retornando PNG placeholder")
         return tiny_png_response()
 
     except requests.exceptions.RequestException as e:
         status = getattr(e.response, 'status_code', 500) if hasattr(e, 'response') else 500
-        logger.error(f"[media_proxy] ❌ Upstream error: status={status} | err={e}", exc_info=True)
+        logger.error(f"[media_proxy] ❌ Upstream error: status={status}", exc_info=True)
         return tiny_png_response()
     except Exception as e:
         logger.error(f"[media_proxy] ❌ Internal error: {e}", exc_info=True)
+        import traceback
+        logger.error(traceback.format_exc())
         return tiny_png_response()
 
 @app.route('/api/instagram/proxy-image', methods=['GET', 'OPTIONS'])
@@ -800,6 +842,94 @@ def cache_status():
             "files": media_files[:10]
         }
     }), 200
+
+@app.route('/api/instagram/debug', methods=['GET'])
+def debug_info():
+    """
+    Endpoint para debugging. Mostra:
+    - Status do token
+    - Tenta chamar IG API
+    - Mostra cache status
+    - Tenta buscar um media_id específico
+    """
+    media_id = request.args.get('id', '').strip()
+    kind = request.args.get('kind', 'image').strip()
+
+    debug = {
+        "timestamp": time.time(),
+        "token_configured": bool(ACCESS_TOKEN),
+        "token_length": len(ACCESS_TOKEN) if ACCESS_TOKEN else 0,
+        "graph_api_url": GRAPH_API_URL,
+        "cache_dir": MEDIA_CACHE_DIR,
+        "cache_dir_exists": os.path.exists(MEDIA_CACHE_DIR),
+        "cache_dir_writable": os.access(MEDIA_CACHE_DIR, os.W_OK) if os.path.exists(MEDIA_CACHE_DIR) else False,
+    }
+
+    # Testar conexão com IG
+    if ACCESS_TOKEN:
+        try:
+            r = requests.get(
+                f"{GRAPH_API_URL}/me",
+                params={"fields": "id,username", "access_token": ACCESS_TOKEN},
+                timeout=10
+            )
+            if r.status_code == 200:
+                debug["instagram_connection"] = "✓ OK"
+                debug["username"] = r.json().get("username")
+            else:
+                debug["instagram_connection"] = f"✗ Status {r.status_code}"
+                debug["ig_error"] = r.text[:200]
+        except Exception as e:
+            debug["instagram_connection"] = f"✗ {str(e)}"
+
+    # Se foi passado media_id, tenta debugar especificamente
+    if media_id:
+        debug["debug_media_id"] = media_id
+        debug["debug_kind"] = kind
+
+        try:
+            logger.info(f"[DEBUG] Testando media_id={media_id} kind={kind}")
+
+            # 1. Buscar info do IG
+            info = ig_get(media_id, fields="media_type,media_url,thumbnail_url")
+            debug["ig_info"] = {
+                "media_type": info.get("media_type"),
+                "media_url": info.get("media_url", "")[:100] if info.get("media_url") else None,
+                "thumbnail_url": info.get("thumbnail_url", "")[:100] if info.get("thumbnail_url") else None,
+            }
+
+            # 2. Selecionar URL
+            src = _pick_src_by_kind(info, kind)
+            debug["selected_url"] = src[:100] if src else None
+
+            # 3. Testar download
+            if src:
+                try:
+                    r = requests.get(src, stream=True, timeout=10)
+                    debug["download_status"] = r.status_code
+                    debug["download_content_type"] = r.headers.get("Content-Type")
+                    debug["download_content_length"] = r.headers.get("Content-Length")
+                except Exception as e:
+                    debug["download_error"] = str(e)
+
+            # 4. Testar cache
+            try:
+                file_path, ct = ensure_media_cached(media_id, kind)
+                debug["cache_result"] = {
+                    "file_path": file_path,
+                    "file_exists": os.path.exists(file_path) if file_path else False,
+                    "file_size": os.path.getsize(file_path) if file_path and os.path.exists(file_path) else None,
+                    "content_type": ct
+                }
+            except Exception as e:
+                debug["cache_error"] = str(e)
+
+        except Exception as e:
+            debug["test_error"] = str(e)
+            import traceback
+            debug["traceback"] = traceback.format_exc()
+
+    return jsonify(debug), 200
 
 @app.route('/api/instagram/url-examples', methods=['GET'])
 def url_examples():
