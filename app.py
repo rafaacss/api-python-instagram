@@ -307,7 +307,9 @@ def proxy_image_legacy():
     parsed = urlparse(url)
     host = (parsed.hostname or '').lower()
     myhost = request.host.split(':', 1)[0].lower()
-    print(f"[DEBUG]   - first image url: {host}")
+    print(f"[DEBUG] raw: {raw}")
+    print(f"[DEBUG] url: {url}")
+    print(f"[DEBUG] parsed_path: {parsed.path.startswith('/api/instagram/media_proxy')}")
     # Allowlist
     allowed = {
         myhost,
