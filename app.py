@@ -506,6 +506,34 @@ def serve_instagram_static(filename):
 def health():
     return {'status': 'ok'}, 200
 
+@app.route('/api/instagram/clear-cache', methods=['POST', 'GET'])
+def clear_cache():
+    """Limpa todo o cache da API"""
+    global api_cache
+
+    # Limpa cache JSON em memória
+    cache_size = len(api_cache)
+    api_cache.clear()
+
+    # Limpa cache de mídia em disco
+    media_files_deleted = 0
+    if os.path.exists(MEDIA_CACHE_DIR):
+        for filename in os.listdir(MEDIA_CACHE_DIR):
+            file_path = os.path.join(MEDIA_CACHE_DIR, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+                    media_files_deleted += 1
+            except Exception as e:
+                print(f"[clear-cache] Erro ao deletar {file_path}: {e}")
+
+    return jsonify({
+        "status": "success",
+        "message": "Cache limpo com sucesso",
+        "json_cache_cleared": cache_size,
+        "media_files_deleted": media_files_deleted
+    }), 200
+
 # =========================================
 # CLI / Main
 # =========================================
