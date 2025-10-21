@@ -76,15 +76,15 @@ def _ext_from_content_type(ct: str) -> str:
 
 def _cache_paths(media_id: str, content_type: str | None = None, kind: str = "image"):
     # procura arquivos já existentes desta variante
-    prefix = f"{media_id}-{kind}."
+    prefix = f"{media_id}."
     for name in os.listdir(MEDIA_CACHE_DIR):
         if name.startswith(prefix):
             p = os.path.join(MEDIA_CACHE_DIR, name)
-            meta = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}.meta")
+            meta = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
             return p, meta
     ext = _ext_from_content_type(content_type) if content_type else '.bin'
-    file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}{ext}")
-    meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}-{kind}.meta")
+    file_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}{ext}")
+    meta_path = os.path.join(MEDIA_CACHE_DIR, f"{media_id}.meta")
     return file_path, meta_path
 
 def _write_meta(meta_path: str, content_type: str):
@@ -217,10 +217,10 @@ def _pick_src_by_kind(info: dict, kind: str) -> str:
     mtype = (info.get("media_type") or "").upper()
     media_url = info.get("media_url")
     thumb_url = info.get("thumbnail_url")
-    if kind == "thumbnail":
-        return thumb_url or media_url or ""
-    if kind == "video":
-        return media_url if mtype == "VIDEO" else (media_url or thumb_url or "")
+    # if kind == "thumbnail":
+    #    return thumb_url or media_url or ""
+    #if kind == "video":
+    #    return media_url if mtype == "VIDEO" else (media_url or thumb_url or "")
     # kind == image (default) → ideal p/ <img>
     if mtype == "VIDEO":
         return thumb_url or ""  # para vídeos, prefira thumbnail
@@ -374,7 +374,7 @@ def get_user_posts():
 
         def cover_url(mid: str) -> str:
             # para vídeo e imagem, entregue SEMPRE uma imagem (kind=image)
-            return f"/api/instagram/media_proxy?id={mid}&kind=image"
+            return f"/api/instagram/media_proxy?id={mid}"
 
         for post in api_data.get("data", []):
             ptype = (post.get("media_type") or "").upper()
