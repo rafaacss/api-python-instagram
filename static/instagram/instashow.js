@@ -11383,7 +11383,7 @@
                     }), {
                         once: !0
                     }), this.view.image.addEventListener("error", (() => {
-                        console.log({ imagens: this.data.images })
+                        console.log({ data: this.data, imagens: this.data.images })
                         const e = this.data.images[this.data.images.length - 1].url,
                             t = this.getImageSrc(e);
                         this.view.image.setAttribute("src", t), this.view.image.addEventListener("load", (() => {
