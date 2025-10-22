@@ -307,7 +307,7 @@ def media_proxy():
 
     except requests.exceptions.RequestException as e:
         status = getattr(e.response, 'status_code', 500)
-        return Response(f'Error: {e}", status=status')
+        return Response(f'Error: {e}', status=status)
     except Exception as e:
         return Response(f'Error: {e}', status=500)
 
@@ -567,30 +567,10 @@ def allowed_file(filename):
     return ext in ALLOWED_EXTENSIONS
 
 
-@app.route('/static/instagram/<path:filename>')
-def serve_instagram_static(filename):
-    return send_from_directory('static/instagram', filename)
-
-
-@app.route('/static/instagramm/<filename>')
+@app.route('/static/instagram/<filename>')
 def serve_static_instagram(filename):
     if not allowed_file(filename):
         abort(404)
-    filepath = os.path.join('static', 'instagram', filename)
-    if not os.path.isfile(filepath):
-        abort(404)
-
-    ext = os.path.splitext(filename)[1]
-    if ext == '.json':
-        mimetype = 'application/json'
-    elif ext == '.js':
-        mimetype = 'application/javascript'
-    else:
-        mimetype = 'application/octet-stream'
-
-    with open(filepath, 'rb') as f:
-        content = f.read()
-    return Response(content, mimetype=mimetype)
 
 
 # =========================
