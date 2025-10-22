@@ -579,6 +579,10 @@ def get_config():
     })
 
 
+@app.route('/health')
+def health():
+    return jsonify({"code": 200, "payload": "OK"})
+
 @app.route('/static/instagram/<path:filename>')
 def serve_static_instagram(filename):
     if not allowed_file(filename):
