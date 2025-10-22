@@ -479,7 +479,8 @@ def warmup(limit_posts: int = 20, force: bool = False) -> dict:
             details.append({"id": mid, "status": "failed", "error": str(e)})
         time.sleep(WARMUP_SLEEP_SECONDS)
 
-    return {"posts_scanned": limit_posts, "media_found": len(mids), "cached": ok, "skipped": skipped, "failed": failed, "details": details}
+    return {"posts_scanned": limit_posts, "media_found": len(mids), "cached": ok, "skipped": skipped, "failed": failed,
+            "details": details}
 
 
 def _is_local_request() -> bool:
@@ -560,17 +561,29 @@ def get_google_reviews():
 # =========================
 # Static
 # =========================
-ALLOWED_EXTENSIONS = {'.json', '.js'}
+ALLOWED_EXTENSIONS = {'.json', '.js', '.html', '.css', '.jpg', '.png'}
 
 def allowed_file(filename):
     ext = os.path.splitext(filename)[1]
     return ext in ALLOWED_EXTENSIONS
 
 
-@app.route('/static/instagram/<filename>')
+@app.route('/api/config')
+def get_config():
+    """Retorna configurações para o frontend."""
+    return jsonify({
+        "code": 200,
+        "payload": {
+            "apiBaseUrl": API_BASE_URL
+        }
+    })
+
+
+@app.route('/static/instagram/<path:filename>')
 def serve_static_instagram(filename):
     if not allowed_file(filename):
         abort(404)
+    return send_from_directory('static/instagram', filename)
 
 
 # =========================
@@ -578,7 +591,8 @@ def serve_static_instagram(filename):
 # =========================
 def cli_warmup(limit: int, force: bool):
     result = warmup(limit_posts=limit, force=force)
-    print(f"WARMUP => posts_scanned={result['posts_scanned']} media_found={result['media_found']} cached={result['cached']} skipped={result['skipped']} failed={result['failed']}")
+    print(
+        f"WARMUP => posts_scanned={result['posts_scanned']} media_found={result['media_found']} cached={result['cached']} skipped={result['skipped']} failed={result['failed']}")
 
 
 if __name__ == '__main__':

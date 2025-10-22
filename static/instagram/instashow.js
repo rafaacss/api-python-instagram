@@ -8,7 +8,41 @@
 (() => {
     var e = {
             79: (e, t, n) => {
-                var i = n(3702),
+                var i = n(3702// Aguardar configuração da API antes de inicializar
+                              InstagramAPI.ready(function(apiBaseUrl) {
+                                  console.log('Instashow.js inicializado com API:', apiBaseUrl);
+
+                                  // Aqui você pode adicionar o código de inicialização do instashow.js
+                                  // Por exemplo:
+                                  // initInstashow(apiBaseUrl);
+                              });
+
+                              // Função auxiliar para buscar posts
+                              function loadInstagramPosts() {
+                                  return fetchInstagramData('/api/instagram/posts')
+                                      .then(response => {
+                                          if (response.code === 200) {
+                                              return response.payload;
+                                          }
+                                          throw new Error('Erro ao carregar posts');
+                                      });
+                              }
+
+                              // Função auxiliar para buscar perfil
+                              function loadInstagramProfile() {
+                                  return fetchInstagramData('/api/instagram/user_profile')
+                                      .then(response => {
+                                          if (response.code === 200) {
+                                              return response.payload;
+                                          }
+                                          throw new Error('Erro ao carregar perfil');
+                                      });
+                              }
+
+                              // Exemplo de uso:
+                              // loadInstagramPosts()
+                              //     .then(posts => console.log('Posts carregados:', posts))
+                              //     .catch(error => console.error('Erro:', error));),
                     r = n(80),
                     a = n(4739),
                     o = n(8655),

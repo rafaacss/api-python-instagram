@@ -1,3 +1,80 @@
+// Configuração dinâmica da API
+(function() {
+    window.InstagramConfig = {
+        apiBaseUrl: null,
+        isReady: false,
+        callbacks: []
+    };
+
+    // Função para aguardar a configuração estar pronta
+    window.InstagramConfig.ready = function(callback) {
+        if (this.isReady) {
+            callback(this.apiBaseUrl);
+        } else {
+            this.callbacks.push(callback);
+        }
+    };
+
+    // Função para gerar a URL completa da API
+    window.InstagramConfig.url = function(endpoint) {
+        return this.apiBaseUrl + endpoint;
+    };
+
+    // Buscar configuração da API
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(data => {
+            window.InstagramConfig.apiBaseUrl = data.payload.apiBaseUrl;
+            window.InstagramConfig.isReady = true;
+
+            // Executar callbacks pendentes
+            window.InstagramConfig.callbacks.forEach(callback => {
+                callback(window.InstagramConfig.apiBaseUrl);
+            });
+            window.InstagramConfig.callbacks = [];
+
+            console.log('API Base URL:', window.InstagramConfig.apiBaseUrl);
+        })
+        .catch(error => {
+            console.error('Erro ao carregar configuração:', error);
+            // Fallback para URL padrão
+            window.InstagramConfig.apiBaseUrl = 'https://api-instagram.redbeauty.com.br';
+            window.InstagramConfig.isReady = true;
+
+            InstagramConfig.ready(function(apiBaseUrl) {
+                fetch(apiBaseUrl + '/api/instagram/posts')
+                    .then(r => r.json())
+                    .then(data => console.log(data));
+            });
+        });
+})();
+
+// Aguardar configuração da API antes de inicializar
+InstagramAPI.ready(function(apiBaseUrl) {
+    console.log('Instagram.js inicializado com API:', apiBaseUrl);
+    
+    // Aqui você pode adicionar o código de inicialização do instagram.js
+    // Por exemplo:
+    // initInstagramWidget(apiBaseUrl);
+});
+
+// Função auxiliar para fazer requisições à API
+function fetchInstagramData(endpoint) {
+    const url = InstagramAPI.url(endpoint);
+    return fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        });
+}
+
+// Exemplo de uso:
+// fetchInstagramData('/api/instagram/posts')
+//     .then(data => console.log('Posts:', data))
+//     .catch(error => console.error('Erro:', error));
+
 /*!
  *
  * 	elfsight.com
