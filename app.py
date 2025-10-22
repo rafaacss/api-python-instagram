@@ -430,7 +430,7 @@ def get_user_posts():
 
             # Fallback: nunca deixe vazio para não quebrar o instashow
             if not images:
-               placeholder_url = "/api/instagram/proxy-image?url=/static/instagram/placeholder.png"
+               placeholder_url = "/static/instagram/placeholder.jpg"
                images = [{"url": placeholder_url}]
                if not media_items:
                    media_items.append({
@@ -461,7 +461,7 @@ def get_user_posts():
                     "followingCount": None
                 },
                 "media": media_items,
-                "images": images,                 # <== chave usada pelo instashow na MODAL
+                "images": images,
                 "image": images[0]["url"] if images else "",
                 "comments": [],
                 "caption": post.get("caption"),
