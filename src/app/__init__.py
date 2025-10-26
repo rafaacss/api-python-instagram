@@ -8,6 +8,7 @@ from .routes.google import bp as google_bp
 from .routes.health import bp as health_bp
 from .routes.static_files import bp as static_bp
 
+
 def create_app():
     os.makedirs(Settings.MEDIA_CACHE_DIR, exist_ok=True)
     app = Flask(__name__, static_folder='static')
