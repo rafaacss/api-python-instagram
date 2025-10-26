@@ -8,55 +8,61 @@
 (() => {
     var e = {
             79: (e, t, n) => {
-                var i = n(3702// Aguardar configuração da API antes de inicializar
-                              InstagramAPI.ready(function(apiBaseUrl) {
-                                  console.log('Instashow.js inicializado com API:', apiBaseUrl);
+              var i = n(3702),
+                  r = n(80),
+                  a = n(4739),
+                  o = n(8655),
+                  s = n(1175);
 
-                                  // Aqui você pode adicionar o código de inicialização do instashow.js
-                                  // Por exemplo:
-                                  // initInstashow(apiBaseUrl);
-                              });
+              // --- seu código pode vir A PARTIR DAQUI (fora do "var ...") ---
+              // garante que InstagramAPI já foi criado pelo bootstrap
+              InstagramAPI.ready(function (apiBaseUrl) {
+                console.log('Instashow.js inicializado com API:', apiBaseUrl);
+                // initInstashow(apiBaseUrl);
+              });
 
-                              // Função auxiliar para buscar posts
-                              function loadInstagramPosts() {
-                                  return fetchInstagramData('/api/instagram/posts')
-                                      .then(response => {
-                                          if (response.code === 200) {
-                                              return response.payload;
-                                          }
-                                          throw new Error('Erro ao carregar posts');
-                                      });
-                              }
+              // helper para chamadas à API
+              function fetchInstagramData(endpoint) {
+                const url = InstagramAPI.url(endpoint); // compõe com apiBaseUrl
+                return fetch(url).then(r => r.json());
+              }
 
-                              // Função auxiliar para buscar perfil
-                              function loadInstagramProfile() {
-                                  return fetchInstagramData('/api/instagram/user_profile')
-                                      .then(response => {
-                                          if (response.code === 200) {
-                                              return response.payload;
-                                          }
-                                          throw new Error('Erro ao carregar perfil');
-                                      });
-                              }
+              // buscar posts
+              function loadInstagramPosts() {
+                return fetchInstagramData('api/instagram/posts').then(response => {
+                  if (response.code === 200) return response.payload;
+                  throw new Error('Erro ao carregar posts');
+                });
+              }
 
-                              // Exemplo de uso:
-                              // loadInstagramPosts()
-                              //     .then(posts => console.log('Posts carregados:', posts))
-                              //     .catch(error => console.error('Erro:', error));),
-                    r = n(80),
-                    a = n(4739),
-                    o = n(8655),
-                    s = n(1175);
+              // buscar perfil
+              function loadInstagramProfile() {
+                return fetchInstagramData('api/instagram/user_profile').then(response => {
+                  if (response.code === 200) return response.payload;
+                  throw new Error('Erro ao carregar perfil');
+                });
+              }
 
-                function l(e) {
-                    var t = -1,
-                        n = null == e ? 0 : e.length;
-                    for (this.clear(); ++t < n;) {
-                        var i = e[t];
-                        this.set(i[0], i[1])
-                    }
+              // Exemplo:
+              // loadInstagramPosts()
+              //   .then(posts => console.log('Posts:', posts))
+              //   .catch(err => console.error(err));
+
+              // --- código original do bundle continua intacto abaixo ---
+              function l(e) {
+                var t = -1,
+                    n = null == e ? 0 : e.length;
+                for (this.clear(); ++t < n;) {
+                  var i2 = e[t];             // renomeei para não sombrear "i" importado
+                  this.set(i2[0], i2[1]);
                 }
-                l.prototype.clear = i, l.prototype.delete = r, l.prototype.get = a, l.prototype.has = o, l.prototype.set = s, e.exports = l
+              }
+              l.prototype.clear = i;
+              l.prototype.delete = r;
+              l.prototype.get = a;
+              l.prototype.has = o;
+              l.prototype.set = s;
+              e.exports = l;
             },
             80: (e, t, n) => {
                 var i = n(6025),
