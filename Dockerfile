@@ -1,43 +1,38 @@
-# Base de runtime + build (usa slim para ficar leve)
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.6
+FROM python:3.12-slim
 
-# ---- Sistema e Poetry ----
 ENV POETRY_VERSION=1.8.3 \
     POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_IN_PROJECT=false \
-    POETRY_VIRTUALENVS_CREATE=true \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/poetry/bin:/venv/bin:$PATH" \
-    VIRTUAL_ENV="/venv" \
+    PATH="/opt/poetry/bin:/app/.venv/bin:$PATH" \
     PORT=8000
 
-# Dependências de build (removidas depois)
+# deps básicos
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential curl \
+      build-essential curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    python -m venv /venv
+# instala Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
 WORKDIR /app
 
-# Copia manifestos do Poetry primeiro para cache de deps
+# só manifests para cache
 COPY pyproject.toml poetry.lock* /app/
 
-# Instala deps de produção no venv
-RUN poetry config virtualenvs.path /venv && \
-    poetry install --only main --no-interaction --no-ansi --no-root && \
-    # Servidor ASGI
-    pip install --no-cache-dir gunicorn uvicorn
+# instala deps + o próprio pacote (SEM --no-root)
+# IMPORTANTE: para layout src/, o pyproject precisa ter:
+# packages = [{ include = "app", from = "src" }]
+RUN poetry install --only main --no-ansi
 
-# Copia o restante do código
-COPY . /app
+# copia o código
+COPY src ./src
+COPY wsgi.py ./wsgi.py
 
-# (Opcional) Se seu pacote é instalável, habilite:
-# RUN poetry install --only main --no-interaction --no-ansi
+EXPOSE 8000
 
-# Ajuste o módulo/objeto ASGI abaixo se necessário (ex.: src.main:app)
-CMD ["/venv/bin/gunicorn", "app:app", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
+# Flask é WSGI → Gunicorn basta
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8000", "wsgi:app"]
