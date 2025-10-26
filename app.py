@@ -568,7 +568,7 @@ def allowed_file(filename):
     return ext in ALLOWED_EXTENSIONS
 
 
-@app.route('/api/config')
+@app.route('/api/instagram/config')
 def get_config():
     """Retorna configurações para o frontend."""
     return jsonify({

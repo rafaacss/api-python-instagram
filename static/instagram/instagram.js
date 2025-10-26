@@ -21,7 +21,7 @@
     };
 
     // Buscar configuração da API
-    fetch('/api/config')
+    fetch('/api/instagram/config')
         .then(response => response.json())
         .then(data => {
             window.InstagramConfig.apiBaseUrl = data.payload.apiBaseUrl;
