@@ -24,6 +24,7 @@ RUN poetry install --only main --no-ansi --no-root
 
 # 2) Agora copia o código
 COPY src ./src
+COPY static ./static
 COPY wsgi.py ./wsgi.py
 
 # 3) Instala o PRÓPRIO pacote (root) agora que o código existe
