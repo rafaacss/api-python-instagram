@@ -4,16 +4,19 @@ version = "0.1.0"
 description = ""
 authors = ["Rafael Santos <rafael.silva@gran.com>"]
 readme = "README.md"
+packages = [{ include = "app", from = "src" }]  # << ESSENCIAL NO LAYOUT SRC
 
 [tool.poetry.dependencies]
-python = "^3.10"
-flask = "^3.1.1"
+python = "^3.12"          # alinhe com sua venv atual (você está em py3.12)
+Flask = "^3.1.1"
 requests = "^2.32.3"
-python-dotenv = "^1.1.0"
-flask-cors = "^6.0.0"
-six = "^1.17.0"
+python-dotenv = "^1.0.1"
+flask-cors = "^4.0.0"     # 6.0.0 não existe no PyPI
 gunicorn = "^23.0.0"
+six = "^1.17.0"
 
+[tool.poetry.scripts]
+api-dev = "main:main"     # opcional: poetry run api-dev --debug
 
 [build-system]
 requires = ["poetry-core"]
