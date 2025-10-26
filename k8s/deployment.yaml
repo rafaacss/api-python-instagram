@@ -53,6 +53,8 @@ spec:
             limits:
               cpu: "250m"
               memory: "512Mi"
+          command: ["/app/.venv/bin/gunicorn"]
+          args: [ "-w","2","-b","0.0.0.0:8000","wsgi:app" ]
       volumes:
         - name: media-cache
           emptyDir:
