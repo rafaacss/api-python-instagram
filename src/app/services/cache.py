@@ -13,3 +13,7 @@ def get_from_cache(key, ttl_seconds):
 
 def set_in_cache(key, data):
     _api_cache[key] = {"data": data, "ts": time.time()}
+
+def clear_memory_cache():
+    _api_cache.clear()
+    return True
