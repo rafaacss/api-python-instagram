@@ -9851,7 +9851,7 @@
                 alias: "eapps-instagram-feed",
                 originalAlias: "instashow",
                 version: "5.6.5",
-                apiProxyUrl: "https://redbeauty.com.br",
+                apiProxyUrl: "https://redbeauty.com.br/",
                 dataServiceApiUrl: "https://api-instagram.redbeauty.com.br/api/instagram"
             };
         const ye = new class {
@@ -9881,7 +9881,7 @@
                     })
                 }
                 proxyImg(e) {
-                    return `https://api-instagram.redbeauty.com.br${e}`
+                    return `${e}`
                 }
                 isNullish(e) {
                     return void 0 === e || null === e
@@ -20227,7 +20227,7 @@
             providerOptions: {
                 platform: {
                     settings: {
-                        apiProxyUrl: "https://redbeauty.com.br"
+                        apiProxyUrl: "https://redbeauty.com.br/"
                     }
                 }
             },
