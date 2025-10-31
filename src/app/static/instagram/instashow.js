@@ -11472,51 +11472,124 @@
                     return Math.min(e.width, e.height) > n * i || t === r.length - 1
                 }))
             }
+            loadPlaceholder() {
+                if (this.view?.image) {
+                    // Placeholder cinza
+                    this.view.image.setAttribute("src",
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1920'%3E%3Crect fill='%23f0f0f0' width='1080' height='1920'/%3E%3C/svg%3E");
+                }
+                this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+            }
             fitImage() {
-                var e;
-                const t = this.getPreviewImage() ?? {};
-                if (!this.data.currentImage || (null === (e = this.data.currentImage) || void 0 === e ? void 0 : e.url) !== t.url && t.width > this.data.currentImage.width) {
-                    var n;
-                    this.data.currentImage = t, this.view.element.classList.remove(ve.alias + "-posts-item-loaded");
-                    const e = !(null === (n = this.data.currentImage.url) || void 0 === n || !n.includes(".mp4")),
-                        i = this.data.currentImage.url ? this.getImageSrc(this.data.currentImage.url) : "",
-                        r = this.data.displaying;
-                    (r.likesCount || r.commentsCount || r.text) && this.view.element.classList.add(ve.alias + "-posts-item-with-data");
-                    const a = this.tuner.get("imageAspectRatio").replace("/", "-");
-                    this.view.element.classList.add(ve.alias + "-posts-item-image-ratio-" + a), e ? (this.view.image.style.display = "none", this.view.video.setAttribute("src", i), this.view.video.addEventListener("loadedmetadata", (e => {
-                        let {
-                            target: t
-                        } = e;
-                        const {
-                            videoWidth: n,
-                            videoHeight: i
-                        } = t;
-                        i / n > 1 ? this.view.element.classList.add(ve.alias + "-posts-item-image-portrait") : this.view.element.classList.add(ve.alias + "-posts-item-image-landscape"), this.view.element.classList.add(ve.alias + "-posts-item-loaded")
-                    }), {
-                        once: !0
-                    })) : (this.view.video.remove(), this.view.image.setAttribute("src", i), this.view.image.setAttribute("alt", `${this.data.text.slice(0,77)}...`), this.view.image.addEventListener("load", (e => {
-                        let {
-                            target: t
-                        } = e;
-                        const {
-                            naturalWidth: n,
-                            naturalHeight: i
-                        } = t;
-                        i / n > 1 ? this.view.element.classList.add(ve.alias + "-posts-item-image-portrait") : this.view.element.classList.add(ve.alias + "-posts-item-image-landscape"), this.view.element.classList.add(ve.alias + "-posts-item-loaded")
-                    }), {
-                        once: !0
-                    }), this.view.image.addEventListener("error", (() => {
-                        console.log({ data: this.data, imagens: this.data.images })
-                        const e = this.data.images[this.data.images.length - 1].url,
-                            t = this.getImageSrc(e);
-                        this.view.image.setAttribute("src", t), this.view.image.addEventListener("load", (() => {
-                            this.view.element.classList.add(ve.alias + "-posts-item-loaded")
-                        }), {
-                            once: !0
-                        })
-                    }), {
-                        once: !0
-                    }))
+                try {
+                    var e;
+                    const t = this.getPreviewImage() ?? {};
+
+                    if (!this.data?.currentImage ||
+                        (this.data.currentImage?.url !== t.url && t.width > this.data.currentImage.width)) {
+
+                        var n;
+                        this.data.currentImage = t;
+                        this.view?.element?.classList?.remove(ve.alias + "-posts-item-loaded");
+
+                        const videoUrl = this.data.currentImage?.url;
+                        const isVideo = videoUrl && videoUrl.includes(".mp4");
+                        const imageSrc = videoUrl ? this.getImageSrc(videoUrl) : "";
+                        const displaying = this.data.displaying ?? {};
+
+                        if (displaying.likesCount || displaying.commentsCount || displaying.text) {
+                            this.view?.element?.classList?.add(ve.alias + "-posts-item-with-data");
+                        }
+
+                        const aspectRatio = this.tuner?.get("imageAspectRatio")?.replace("/", "-") ?? "1-1";
+                        this.view?.element?.classList?.add(ve.alias + "-posts-item-image-ratio-" + aspectRatio);
+
+                        if (isVideo) {
+                            // Vídeo
+                            if (this.view?.image) this.view.image.style.display = "none";
+                            if (this.view?.video) {
+                                this.view.video.setAttribute("src", imageSrc);
+                                this.view.video.addEventListener("loadedmetadata", (e => {
+                                    try {
+                                        const { videoWidth, videoHeight } = e.target ?? {};
+                                        if (videoHeight && videoWidth) {
+                                            videoHeight / videoWidth > 1 ?
+                                                this.view?.element?.classList?.add(ve.alias + "-posts-item-image-portrait") :
+                                                this.view?.element?.classList?.add(ve.alias + "-posts-item-image-landscape");
+                                        }
+                                        this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+                                    } catch (err) {
+                                        console.error("Erro ao processar vídeo", err);
+                                        this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+                                    }
+                                }), { once: true });
+                            }
+                        } else {
+                            // Imagem
+                            if (this.view?.video) this.view.video.remove();
+                            if (this.view?.image) {
+                                this.view.image.setAttribute("src", imageSrc);
+                                this.view.image.setAttribute("alt", `${this.data?.text?.slice(0, 77) ?? "Imagem"}...`);
+
+                                this.view.image.addEventListener("load", (e => {
+                                    try {
+                                        const { naturalWidth, naturalHeight } = e.target ?? {};
+                                        if (naturalHeight && naturalWidth) {
+                                            naturalHeight / naturalWidth > 1 ?
+                                                this.view?.element?.classList?.add(ve.alias + "-posts-item-image-portrait") :
+                                                this.view?.element?.classList?.add(ve.alias + "-posts-item-image-landscape");
+                                        }
+                                        this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+                                    } catch (err) {
+                                        console.error("Erro ao processar imagem", err);
+                                        this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+                                    }
+                                }), { once: true });
+
+                                this.view.image.addEventListener("error", (() => {
+                                    console.log("Erro ao carregar imagem", {
+                                        data: this.data,
+                                        imagens: this.data?.images
+                                    });
+
+                                    // ✅ Validações robustas
+                                    const images = this.data?.images;
+                                    if (!Array.isArray(images) || images.length === 0) {
+                                        console.warn("Nenhuma imagem de fallback disponível");
+                                        this.loadPlaceholder();
+                                        return;
+                                    }
+
+                                    const lastImage = images[images.length - 1];
+                                    if (!lastImage?.url) {
+                                        console.warn("Imagem de fallback não tem URL", lastImage);
+                                        this.loadPlaceholder();
+                                        return;
+                                    }
+
+                                    try {
+                                        const fallbackSrc = this.getImageSrc(lastImage.url);
+                                        this.view.image.setAttribute("src", fallbackSrc);
+
+                                        this.view.image.addEventListener("load", (() => {
+                                            this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
+                                        }), { once: true });
+
+                                        this.view.image.addEventListener("error", (() => {
+                                            console.error("Fallback também falhou", lastImage.url);
+                                            this.loadPlaceholder();
+                                        }), { once: true });
+                                    } catch (err) {
+                                        console.error("Erro ao processar fallback", err);
+                                        this.loadPlaceholder();
+                                    }
+                                }), { once: true });
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Erro geral em fitImage()", err);
+                    this.view?.element?.classList?.add(ve.alias + "-posts-item-loaded");
                 }
             }
             fitText() {
