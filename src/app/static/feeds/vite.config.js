@@ -5,19 +5,13 @@ import path from "path";
 
 export default defineConfig({
   plugins: [vue()],
-  // raiz passa a ser a própria pasta feeds/
   root: ".",
+  base: "/feeds/",          // <- IMPORTANTÍSSIMO
   build: {
     outDir: "dist",
     emptyOutDir: true,
   },
-  server: {
-    port: 5173,
-    open: true,
-  },
   resolve: {
-    alias: {
-      "@": path.resolve(process.cwd(), "./src"),
-    },
+    alias: { "@": path.resolve(process.cwd(), "./src") },
   },
 });
