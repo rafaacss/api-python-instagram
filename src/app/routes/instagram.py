@@ -31,6 +31,77 @@ def clean_param(value, param_name="param"):
     return value
 
 
+def extract_images_from_media(media_items):
+    """
+    ✅ NOVO: Extrai images do array de media para compatibilidade com widget
+
+    O widget JavaScript espera um array 'images' com as URLs das imagens.
+    Este método extrai dos media items e retorna no formato esperado.
+
+    Args:
+        media_items: Array de media items com {type, url, cover, id}
+
+    Returns:
+        Array de imagens: [{url, width, height}, ...]
+
+    Example:
+        media_items = [
+            {
+                "type": "image",
+                "url": "https://...",
+                "cover": {...}
+            }
+        ]
+        images = extract_images_from_media(media_items)
+        # Result: [{"url": "https://...", "width": 1080, "height": 1920}]
+    """
+    images = []
+
+    for media in media_items:
+        try:
+            # Tipo de media
+            media_type = media.get("type", "").lower()
+
+            # ✅ Para imagens
+            if media_type == "image":
+                # Preferir URL direta se disponível
+                if media.get("url"):
+                    images.append({
+                        "url": media.get("url"),
+                        "width": 1080,
+                        "height": 1920
+                    })
+                    logger.debug(f"Imagem extraída (URL direta): {media.get('url')[:60]}")
+
+                # Fallback para cover thumbnail
+                elif media.get("cover", {}).get("thumbnail", {}).get("url"):
+                    thumb = media["cover"]["thumbnail"]
+                    images.append({
+                        "url": thumb.get("url"),
+                        "width": thumb.get("width", 1080),
+                        "height": thumb.get("height", 1920)
+                    })
+                    logger.debug(f"Imagem extraída (cover): {thumb.get('url')[:60]}")
+
+            # ✅ Para vídeos, usar thumbnail do cover
+            elif media_type == "video":
+                if media.get("cover", {}).get("thumbnail", {}).get("url"):
+                    thumb = media["cover"]["thumbnail"]
+                    images.append({
+                        "url": thumb.get("url"),
+                        "width": thumb.get("width", 1080),
+                        "height": thumb.get("height", 1920)
+                    })
+                    logger.debug(f"Thumbnail de vídeo extraído: {thumb.get('url')[:60]}")
+
+        except Exception as e:
+            logger.warning(f"Erro ao extrair imagem de media: {e}")
+            continue
+
+    logger.info(f"Extraídas {len(images)} imagens de {len(media_items)} media items")
+    return images
+
+
 @bp.get("/config")
 def get_config():
     return jsonify({"code": 200, "payload": {"apiBaseUrl": current_app.config["API_BASE_URL"]}})
@@ -183,8 +254,6 @@ def posts():
         for post in api_data.get("data", []):
             ptype = (post.get("media_type") or "").upper()
             media_items = []
-            print(post)
-            print(ptype)
 
             if ptype in ("IMAGE", "VIDEO"):
                 mid = post.get("id")
@@ -234,6 +303,10 @@ def posts():
                 "followingCount": user_info.get("followingCount")
             }
 
+            # ✅ NOVO: Extrair images do media para compatibilidade com widget
+            images = extract_images_from_media(media_items)
+            logger.info(f"Post {post.get('id')}: extraídas {len(images)} imagens de {len(media_items)} media items")
+
             formatted.append({
                 "vendorId": post.get("id"),
                 "type": (post.get("media_type") or "").lower().replace("_album", ""),
@@ -241,6 +314,7 @@ def posts():
                 "publishedAt": post.get("timestamp"),
                 "author": author,
                 "media": media_items,
+                "images": images,  # ✅ NOVO: Campo images com as URLs
                 "comments": [],
                 "caption": post.get("caption"),
                 "commentsCount": post.get("comments_count", 0),
@@ -251,7 +325,7 @@ def posts():
 
         final_resp = {"code": 200, "payload": formatted}
         set_in_cache(cache_key, final_resp)
-        logger.info(f"Posts formatados e cacheados: {len(formatted)}")
+        logger.info(f"Posts formatados e cacheados: {len(formatted)} posts com images")
         return jsonify(final_resp)
     except Exception as e:
         logger.error(f"Erro ao buscar posts: {e}", exc_info=True)
