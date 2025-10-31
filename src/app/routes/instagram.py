@@ -314,7 +314,7 @@ def posts():
                 "publishedAt": post.get("timestamp"),
                 "author": author,
                 "media": media_items,
-                "images": images,  # ✅ NOVO: Campo images com as URLs
+                "images": images,
                 "comments": [],
                 "caption": post.get("caption"),
                 "commentsCount": post.get("comments_count", 0),

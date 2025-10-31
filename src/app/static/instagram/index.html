@@ -7,11 +7,11 @@
   </head>
   <body>
     <div class="elfsight-app-redbeauty eapps-instagram-feed es-widget eapps-widget"></div>
-
-    <!-- 1) Bootstrap que cria window.InstagramAPI -->
-    <script src="instagram-api.js"></script>
-
-    <!-- 2) Seu script que usa InstagramAPI -->
-    <script src="instagram.js"></script>
   </body>
 </html>
+
+<script type="text/javascript">
+  const ts = Date.now(); // gera timestamp atual
+  document.write(`<script src="instagram-api.js?v=${ts}"><\/script>`);
+  document.write(`<script src="instagram.js?v=${ts}"><\/script>`);
+</script>
