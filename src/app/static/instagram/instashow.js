@@ -9881,6 +9881,7 @@
                     })
                 }
                 proxyImg(e) {
+                    console.log({ url: e })
                     return `${e}`
                 }
                 isNullish(e) {
