@@ -11528,6 +11528,15 @@
                             // Imagem
                             if (this.view?.video) this.view.video.remove();
                             if (this.view?.image) {
+                                const images = this.data?.images;
+
+                                if (!images){
+                                    const image = window.InstagramConfig.url('/api/instagram/media_proxy?id='+(this.data?.id ?? ''));
+                                    this.view.image.setAttribute("src", image);
+                                    this.getImageSrc(videoUrl)
+                                    this.data?.images = [{'url': Instagram.config'https://i.imgur.com/0000000.jpg'}];
+                                }
+
                                 this.view.image.setAttribute("src", imageSrc);
                                 this.view.image.setAttribute("alt", `${this.data?.text?.slice(0, 77) ?? "Imagem"}...`);
 
@@ -11554,6 +11563,7 @@
 
                                     // ✅ Validações robustas
                                     const images = this.data?.images;
+
                                     if (!Array.isArray(images) || images.length === 0) {
                                         console.warn("Nenhuma imagem de fallback disponível");
                                         this.loadPlaceholder();

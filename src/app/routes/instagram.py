@@ -35,71 +35,96 @@ def clean_param(value, param_name="param"):
 def extract_images_from_media(media_items):
     """
     ✅ NOVO: Extrai images do array de media para compatibilidade com widget
+    ✅ NOVO: Inclui fallbackUrl usando media_id para recuperação de erros
 
     O widget JavaScript espera um array 'images' com as URLs das imagens.
-    Este método extrai dos media items e retorna no formato esperado.
+    Se uma URL falhar, o widget tenta a fallbackUrl (seu server).
 
     Args:
         media_items: Array de media items com {type, url, cover, id}
 
     Returns:
-        Array de imagens: [{url, width, height}, ...]
+        Array de imagens: [{url, fallbackUrl, mediaId, width, height}, ...]
 
     Example:
         media_items = [
             {
                 "type": "image",
                 "url": "https://...",
-                "cover": {...}
+                "cover": {...},
+                "id": "17886774234352278"
             }
         ]
         images = extract_images_from_media(media_items)
-        # Result: [{"url": "https://...", "width": 1080, "height": 1920}]
+        # Result: [{
+        #   "url": "https://scontent-lax3-1.cdninstagram.com/...",
+        #   "fallbackUrl": "https://api.../media_proxy?id=17886774234352278&thumb=1",
+        #   "mediaId": "17886774234352278",
+        #   "width": 1080,
+        #   "height": 1920
+        # }]
     """
     images = []
+    api_base = current_app.config['API_BASE_URL'].rstrip('/')
 
     for media in media_items:
         try:
-            # Tipo de media
             media_type = media.get("type", "").lower()
+            media_id = media.get("id", "")  # ✅ Pegar ID para fallback
+
+            if not media_id:
+                logger.warning("Media item sem ID")
+                continue
 
             # ✅ Para imagens
             if media_type == "image":
-                # Preferir URL direta se disponível
+                primary_url = None
+
+                # Preferir URL direta
                 if media.get("url"):
-                    images.append({
-                        "url": media.get("url"),
-                        "width": 1080,
-                        "height": 1920
-                    })
-                    logger.debug(f"Imagem extraída (URL direta): {media.get('url')[:60]}")
+                    primary_url = media.get("url")
+                    logger.debug(f"Imagem com URL direta: {primary_url[:60]}...")
 
                 # Fallback para cover thumbnail
                 elif media.get("cover", {}).get("thumbnail", {}).get("url"):
-                    thumb = media["cover"]["thumbnail"]
+                    primary_url = media["cover"]["thumbnail"].get("url")
+                    logger.debug(f"Imagem com URL de cover: {primary_url[:60]}...")
+
+                if primary_url:
+                    # ✅ NOVO: Incluir fallbackUrl usando media_id
+                    fallback_url = f"{api_base}/api/instagram/media_proxy?id={media_id}&thumb=1"
+
                     images.append({
-                        "url": thumb.get("url"),
-                        "width": thumb.get("width", 1080),
-                        "height": thumb.get("height", 1920)
+                        "url": primary_url,
+                        "fallbackUrl": fallback_url,
+                        "mediaId": media_id,
+                        "width": 1080,
+                        "height": 1920
                     })
-                    logger.debug(f"Imagem extraída (cover): {thumb.get('url')[:60]}")
+                    logger.debug(f"Imagem com fallback: {media_id}")
 
             # ✅ Para vídeos, usar thumbnail do cover
             elif media_type == "video":
                 if media.get("cover", {}).get("thumbnail", {}).get("url"):
                     thumb = media["cover"]["thumbnail"]
+                    fallback_url = f"{api_base}/api/instagram/media_proxy?id={media_id}&thumb=1"
+
                     images.append({
                         "url": thumb.get("url"),
+                        "fallbackUrl": fallback_url,
+                        "mediaId": media_id,
                         "width": thumb.get("width", 1080),
                         "height": thumb.get("height", 1920)
                     })
-                    logger.debug(f"Thumbnail de vídeo extraído: {thumb.get('url')[:60]}")
+                    logger.debug(f"Thumbnail de vídeo extraído: {media_id}")
+                else:
+                    logger.warning(f"Vídeo sem thumbnail: {media_id}")
 
         except Exception as e:
             logger.warning(f"Erro ao extrair imagem de media: {e}")
             continue
 
-    logger.info(f"Extraídas {len(images)} imagens de {len(media_items)} media items")
+    logger.info(f"Extraídas {len(images)} imagens de {len(media_items)} media items com fallback URLs")
     return images
 
 
@@ -340,6 +365,7 @@ def posts():
             }
 
             # ✅ NOVO: Extrair images do media para compatibilidade com widget
+            # ✅ NOVO: Com fallbackUrl e mediaId para recuperação de erros
             images = extract_images_from_media(media_items)
             logger.info(f"Post {post.get('id')}: extraídas {len(images)} imagens de {len(media_items)} media items")
 
