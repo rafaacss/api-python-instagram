@@ -1,6 +1,6 @@
 # services/media_cache.py
 import os, time, mimetypes, re, logging
-from flask import Response, request, current_app, abort
+from flask import Response, request, current_app, abort, send_file
 from .http import get
 from .instagram import ig_get
 

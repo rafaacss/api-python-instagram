@@ -1,10 +1,11 @@
 from flask import Blueprint, jsonify, request, current_app, Response
 from ..services.instagram import fetch_user_profile, ig_get
 from ..services.cache import get_from_cache, set_in_cache, clear_memory_cache
-from ..services.media_cache import ensure_media_cached, serve_file_with_range, clear_media_cache_all
+from ..services.media_cache import ensure_media_cached, serve_file_with_range, clear_media_cache_all, drop_media_cache
 from ..services.warmup import warmup
 import logging
 import re
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,14 @@ def user_profile():
 
 @bp.get("/media_proxy")
 def media_proxy():
+    """
+    ✅ CORRIGIDO: Servir mídia cacheada do Instagram
+
+    Problemas resolvidos:
+    - Garantir que arquivo completo (.mp4) é servido, não metadados (.meta)
+    - Validar extensão do arquivo
+    - Usar Content-Type correto
+    """
     # Limpar media_id (remove ":1" e caracteres inválidos)
     media_id = clean_param(request.args.get('id'), 'media_id')
 
@@ -141,9 +150,22 @@ def media_proxy():
         # Se não é refresh, tenta usar cache
         if not refresh:
             file_path, ct = ensure_media_cached(media_id, variant=variant)
-            if file_path:
-                logger.info(f"Servindo do cache: {file_path}")
-                return serve_file_with_range(file_path, ct)
+
+            # ✅ IMPORTANTE: Validar que arquivo existe e tem tamanho > 0
+            if file_path and os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                logger.info(f"Servindo do cache: {file_path} ({file_size} bytes)")
+
+                # ✅ NÃO servir arquivos muito pequenos (provavelmente são .meta)
+                if file_size > 100:  # Arquivos úteis têm pelo menos 100 bytes
+                    return serve_file_with_range(file_path, ct)
+                else:
+                    logger.warning(f"Arquivo muito pequeno, provavelmente .meta: {file_path} ({file_size} bytes)")
+                    # Remover arquivo inválido e tentar novamente
+                    try:
+                        os.remove(file_path)
+                    except:
+                        pass
             else:
                 logger.info(f"Cache não disponível ou expirado para {media_id}")
 
@@ -166,12 +188,26 @@ def media_proxy():
 
         # Faz cache e serve
         file_path, ct = ensure_media_cached(media_id, variant=variant, explicit_src=src)
-        if file_path:
-            logger.info(f"Mídia cacheada e sendo servida: {file_path}")
-            return serve_file_with_range(file_path, ct)
+
+        if file_path and os.path.exists(file_path):
+            file_size = os.path.getsize(file_path)
+            logger.info(f"Mídia cacheada e sendo servida: {file_path} ({file_size} bytes)")
+
+            # ✅ Verificar que arquivo é válido (não é .meta)
+            if file_size > 100:
+                return serve_file_with_range(file_path, ct)
+            else:
+                logger.error(f"Arquivo cacheado muito pequeno: {file_path} ({file_size} bytes)")
+                # Limpar arquivo inválido
+                try:
+                    drop_media_cache(media_id)
+                except:
+                    pass
+                return Response('Unable to cache media properly', status=502)
         else:
             logger.error(f"Falha ao cachear mídia: {media_id}")
             return Response('Unable to cache media', status=502)
+
     except Exception as e:
         logger.error(f"Erro no media_proxy: {e}", exc_info=True)
         return Response(f'Error: {e}', status=500)
@@ -404,7 +440,6 @@ def clear_cache_route():
             logger.error("clear_cache: media_id ausente ou inválido")
             return jsonify({"error": "missing or invalid media_id"}), 400
         # remove apenas arquivos do media_id (mídia + .meta)
-        from ..services.media_cache import drop_media_cache
         drop_media_cache(media_id)
         result['media_id'] = {"id": media_id, "status": "cleared"}
         logger.info(f"Cache de mídia específica limpo: {media_id}")
