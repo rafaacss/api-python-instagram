@@ -11067,72 +11067,153 @@
                 return this.items.length > this.cursor
             }
             prepareData(e) {
-                let t = [];
-                return e.posts.forEach((n => {
-                    const i = "video" === n.type || "reel" === n.type;
-                    let r = {
-                        id: n.id,
-                        code: n.code,
+            const t = [];
+            return e.forEach((e => {
+                var n;
+                const i = "video" === e.type || "reel" === e.type,
+                    r = {
+                        id: e.vendorId,
+                        code: e.code,
                         caption: {
-                            text: n.caption
+                            text: e.caption
                         },
-                        link: n.link,
-                        type: n.type,
-                        location: n.location,
-                        images: n.images,
+                        link: e.link,
+                        type: "album" === e.type ? "carousel" : e.type,
+                        images: this.getPostImage(e),
                         likes: {
-                            count: n.likeCount
+                            count: e.likesCount
                         },
-                        created_time: n.createdTime,
-                        video_url: i ? n.videoUrl : void 0
+                        created_time: new Date(e.publishedAt).getTime() / 1e3,
+                        video_url: i ? null === (n = e.media) || void 0 === n || null === (n = n[0]) || void 0 === n ? void 0 : n.url : void 0
+                    },
+                    a = e.author || {};
+
+                (a.username || a.full_name || a.profilePictureUrl) && (r.user = {
+                    id: a.id || null,
+                    username: a.username || null,
+                    full_name: a.name || null,
+                    profile_picture: a.profilePictureUrl || null,
+                    isVerified: a.isVerifiedProfile || !1,
+                    biography: a.biography || null,
+                    postsCount: a.postsCount ?? null,
+                    followersCount: a.followersCount ?? null,
+                    followingCount: a.followingCount ?? null
+                });
+
+                const o = "album" === e.type;
+
+                // ✅ CORREÇÃO PRINCIPAL: Trata carousel com validações robustas
+                r.carousel = [], o && (r.carousel = (e.media || []).map((mediaItem => {
+                    const carouselItem = {
+                        type: mediaItem.type
                     };
-                    const a = n.user || e.user || {};
-                    (a.username || a.full_name || a.profile_pic_url) && (r.user = {
-                        id: a.id || null,
-                        username: a.username || null,
-                        full_name: a.full_name || null,
-                        profile_picture: a.profile_pic_url || null,
-                        isVerified: a.is_verified || !1,
-                        biography: a.biography || null,
-                        postsCount: a.postsCount ?? null,
-                        followersCount: a.followersCount ?? null,
-                        followingCount: a.followingCount ?? null
-                    }), r.carousel = (n.carousel || []).map((e => {
-                        let {
-                            type: t,
-                            videoUrl: n,
-                            images: i
-                        } = e;
-                        const r = {
-                            type: t
-                        };
-                        return n ? r.videos = {
-                            standard_resolution: {
-                                url: n
+
+                    try {
+                        if ("video" === mediaItem.type) {
+                            // Para vídeos: pega a URL do vídeo se existir
+                            if (mediaItem.url) {
+                                carouselItem.videos = {
+                                    standard_resolution: {
+                                        url: mediaItem.url
+                                    }
+                                };
                             }
-                        } : r.images = i, r
-                    }));
-                    const o = (n.comments || []).map((e => {
-                        let {
-                            owner: t,
-                            text: n
-                        } = e;
-                        return {
-                            from: {
-                                username: t.username,
-                                profile_picture: t.profile_pic_url
-                            },
-                            text: n
+
+                            // Para vídeos, tenta usar cover como imagem de thumbnail
+                            if (mediaItem.cover &&
+                                mediaItem.cover.thumbnail &&
+                                mediaItem.cover.thumbnail.url) {
+                                carouselItem.images = {
+                                    original: {
+                                        url: mediaItem.cover.thumbnail.url
+                                    },
+                                    thumbnail: {
+                                        url: mediaItem.cover.thumbnail.url,
+                                        width: mediaItem.cover.thumbnail.width || 1080,
+                                        height: mediaItem.cover.thumbnail.height || 1920
+                                    },
+                                    standard_resolution: {
+                                        url: mediaItem.cover.thumbnail.url
+                                    }
+                                };
+                            }
+                        } else {
+                            // Para imagens: pega do cover.thumbnail
+                            // ✅ Validação: verifica cada nível antes de acessar
+                            if (mediaItem.cover &&
+                                typeof mediaItem.cover === 'object' &&
+                                mediaItem.cover.thumbnail &&
+                                typeof mediaItem.cover.thumbnail === 'object' &&
+                                mediaItem.cover.thumbnail.url) {
+
+                                const thumbUrl = mediaItem.cover.thumbnail.url;
+                                const thumbWidth = mediaItem.cover.thumbnail.width || 1080;
+                                const thumbHeight = mediaItem.cover.thumbnail.height || 1920;
+
+                                carouselItem.images = {
+                                    original: {
+                                        url: thumbUrl,
+                                        width: thumbWidth,
+                                        height: thumbHeight
+                                    },
+                                    thumbnail: {
+                                        url: thumbUrl,
+                                        width: thumbWidth,
+                                        height: thumbHeight
+                                    },
+                                    standard_resolution: {
+                                        url: thumbUrl,
+                                        width: thumbWidth,
+                                        height: thumbHeight
+                                    }
+                                };
+                            } else {
+                                // ✅ Fallback: se não tiver cover, cria structure vazia mas válida
+                                console.warn(`Imagem sem cover válido: ${mediaItem.id}`, mediaItem);
+                                carouselItem.images = {
+                                    original: { url: "" },
+                                    thumbnail: { url: "" },
+                                    standard_resolution: { url: "" }
+                                };
+                            }
                         }
-                    }));
-                    r.comments = {
-                        count: n.commentCount || 0,
-                        data: o
-                    };
-                    const s = n.caption ? n.caption.match(/#([\w\p{L}]+)/giu) : void 0;
-                    r.tags = s && s.length > 0 ? s.map((e => e.slice(1))) : [], t.push(r)
-                })), t
-            }
+                    } catch (err) {
+                        console.error(`Erro ao processar media item: ${mediaItem.id}`, err, mediaItem);
+                        // ✅ Fallback seguro: retorna estrutura vazia em caso de erro
+                        carouselItem.images = {
+                            original: { url: "" },
+                            thumbnail: { url: "" },
+                            standard_resolution: { url: "" }
+                        };
+                    }
+
+                    return carouselItem;
+                })));
+
+                const s = (e.comments || []).map((e => {
+                    let {
+                        username: t,
+                        profilePictureUrl: n,
+                        text: i
+                    } = e;
+                    return {
+                        from: {
+                            username: t,
+                            profile_picture: n
+                        },
+                        text: i
+                    }
+                }));
+
+                r.comments = {
+                    count: e.commentsCount || 0,
+                    data: s
+                };
+
+                const l = e.caption ? e.caption.match(/#([\w\p{L}]+)/giu) : void 0;
+                r.tags = (null === l || void 0 === l ? void 0 : l.length) > 0 ? l.map((e => e.slice(1))) : [], t.push(r)
+            })), t
+        }
             destroy() {
                 this.destroyed = !0, clearTimeout(this.fetchTimeout)
             }
