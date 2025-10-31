@@ -1,12 +1,14 @@
+// vite.config.js
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from "path";
 
 export default defineConfig({
   plugins: [vue()],
-  root: path.resolve(__dirname, "./src"),
+  // raiz passa a ser a própria pasta feeds/
+  root: ".",
   build: {
-    outDir: "../dist",
+    outDir: "dist",
     emptyOutDir: true,
   },
   server: {
@@ -15,7 +17,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(process.cwd(), "./src"),
     },
   },
 });
