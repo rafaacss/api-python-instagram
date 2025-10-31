@@ -6,7 +6,7 @@ import path from "path";
 export default defineConfig({
   plugins: [vue()],
   root: ".",
-  base: "/feeds/",          // <- IMPORTANTÍSSIMO
+  base: "/static/feeds/",          // <- IMPORTANTÍSSIMO
   build: {
     outDir: "dist",
     emptyOutDir: true,
