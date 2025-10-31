@@ -1,58 +1,246 @@
 import os
 import logging
-import mimetypes
-from flask import Blueprint, send_from_directory, abort, current_app, jsonify, make_response
+from flask import Blueprint, send_from_directory, abort, jsonify, make_response
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("static_files", __name__)
-ALLOWED_EXTENSIONS = {'.json', '.js', '.html', '.css', '.jpg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi'}
+
+# ---------------------------------------------------------
+# Extensões aceitas (inclui tipos gerados pelo Vite/Tailwind)
+# ---------------------------------------------------------
+ALLOWED_EXTENSIONS = {
+    '.json', '.js', '.mjs', '.html', '.css',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+    '.mp4', '.webm', '.mov', '.avi',
+    '.woff', '.woff2', '.ttf', '.eot',
+    '.ico', '.txt', '.map'
+}
 
 
-def allowed_file(filename):
-    """Verifica se a extensão do arquivo é permitida"""
-    # Remove query parameters (ex: ?v=123)
+def allowed_file(filename: str) -> bool:
+    """Verifica se a extensão do arquivo é permitida."""
     filename = filename.split('?')[0]
     ext = os.path.splitext(filename)[1].lower()
     return ext in ALLOWED_EXTENSIONS
 
 
-def get_base_dir():
+# ---------------------------------------------------------
+# Localização de diretórios estáticos por subpasta
+#   subfolder = 'instagram'      -> .../static/instagram
+#   subfolder = 'feeds/dist'     -> .../static/feeds/dist
+# ---------------------------------------------------------
+def get_base_dir(subfolder: str = "instagram") -> str:
     """
     Detecta automaticamente o diretório correto dos arquivos estáticos
-
-    Tenta em ordem:
-    1. /app/static/instagram (Docker com volume correto)
-    2. /static/instagram (Docker com volume mapeado diretamente)
-    3. /app/src/static/instagram (Docker com src)
-    4. static/instagram (Local sem Docker)
-    5. ./static/instagram (Local alternativo)
+    para a subpasta informada.
     """
-
-    possible_paths = [
-        "src/app/static/instagram",
-        "/app/static/instagram",
-        "/static/instagram",
-        "/app/src/static/instagram",
-        "static/instagram",
-        "./static/instagram",
-        os.path.join(os.getcwd(), "static/instagram"),
+    candidates = [
+        f"src/app/static/{subfolder}",
+        f"/app/static/{subfolder}",
+        f"/static/{subfolder}",
+        f"/app/src/static/{subfolder}",
+        f"static/{subfolder}",
+        f"./static/{subfolder}",
+        os.path.join(os.getcwd(), f"static/{subfolder}"),
     ]
 
-    logger.info(f"Procurando diretório estático em:")
-
-    for path in possible_paths:
+    logger.info("Procurando diretório estático para '%s':", subfolder)
+    for path in candidates:
         abs_path = os.path.abspath(path)
         exists = os.path.exists(abs_path)
-        logger.info(f"  - {abs_path} {'✓' if exists else '✗'}")
-
+        logger.info("  - %s %s", abs_path, '✓' if exists else '✗')
         if exists and os.path.isdir(abs_path):
-            logger.info(f"✓ Usando: {abs_path}")
+            logger.info("✓ Usando: %s", abs_path)
             return abs_path
 
-    logger.warning(f"⚠ Nenhum diretório encontrado, usando padrão: {possible_paths[0]}")
-    return os.path.abspath(possible_paths[0])
+    logger.warning("⚠ Nenhum diretório encontrado para '%s', usando padrão: %s", subfolder, candidates[0])
+    return os.path.abspath(candidates[0])
 
+
+def _safe_send(base_dir: str, clean_filename: str):
+    """
+    Valida traversal, existência e envia arquivo;
+    retorna (response, not_found_bool).
+    """
+    requested_path = os.path.abspath(os.path.join(base_dir, clean_filename))
+
+    # Path traversal
+    if not requested_path.startswith(base_dir):
+        logger.error("Tentativa de path traversal: %s", clean_filename)
+        abort(403)
+
+    # Arquivo existe?
+    if not os.path.exists(requested_path):
+        logger.warning("Arquivo não encontrado: %s", requested_path)
+        try:
+            files = os.listdir(base_dir)
+            logger.info("Arquivos disponíveis em %s: %s", base_dir, files)
+        except Exception as e:
+            logger.error("Erro ao listar %s: %s", base_dir, e)
+        return None, True
+
+    logger.info("Enviando: %s", requested_path)
+    response = make_response(send_from_directory(base_dir, clean_filename))
+
+    # Ajuste de content-type útil
+    if clean_filename.endswith('.json'):
+        response.headers['Content-Type'] = 'application/json'
+    elif clean_filename.endswith('.js') or clean_filename.endswith('.mjs'):
+        response.headers['Content-Type'] = 'application/javascript'
+
+    # Cache leve + CORS liberado
+    response.headers['Cache-Control'] = 'public, max-age=3600'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response, False
+
+
+# ======================================================================
+# FEEDS (widget Vue compilado em static/feeds/dist)  --------------------
+# ======================================================================
+
+@bp.get("/feeds")
+def feeds_index():
+    """
+    SPA do widget (Vite) em static/feeds/dist/index.html
+    """
+    base_dir = get_base_dir("feeds/dist")
+    resp, not_found = _safe_send(base_dir, "index.html")
+    if not_found:
+        abort(404)
+    return resp
+
+
+@bp.get("/feeds/<path:filename>")
+def feeds_assets(filename):
+    """
+    Arquivos do build (JS/CSS/assets).
+    Se não existir, faz fallback para index.html (SPA).
+    """
+    clean = filename.split('?')[0]
+    base_dir = get_base_dir("feeds/dist")
+
+    resp, not_found = _safe_send(base_dir, clean)
+    if not_found:
+        logger.info("Fallback SPA para /feeds: %s", clean)
+        resp2, not_found2 = _safe_send(base_dir, "index.html")
+        if not_found2:
+            abort(404)
+        return resp2
+    return resp
+
+
+@bp.get("/static/feeds/<path:filename>")
+def serve_static_feeds(filename):
+    """
+    Alternativa direta: /static/feeds/... (útil para assets absolutos)
+    """
+    clean = filename.split('?')[0]
+    if not allowed_file(clean):
+        logger.warning("Extensão não permitida: %s", clean)
+        abort(404)
+
+    base_dir = get_base_dir("feeds/dist")
+    resp, not_found = _safe_send(base_dir, clean)
+    if not_found:
+        abort(404)
+    return resp
+
+
+@bp.get("/api/static/feeds/<path:filename>")
+def api_static_feeds(filename):
+    """
+    Serve arquivos de feeds via API (com CORS)
+    """
+    clean = filename.split('?')[0]
+    if not allowed_file(clean):
+        return jsonify({"error": "File type not allowed"}), 404
+
+    base_dir = get_base_dir("feeds/dist")
+    resp, not_found = _safe_send(base_dir, clean)
+    if not_found:
+        return jsonify({"error": "File not found"}), 404
+    return resp
+
+
+@bp.get("/api/feeds/files/list")
+def list_feeds_files():
+    """
+    Lista arquivos disponíveis em static/feeds/dist (debug)
+    """
+    base_dir = get_base_dir("feeds/dist")
+    if not os.path.exists(base_dir):
+        return jsonify({
+            "error": "Directory not found",
+            "base_dir": base_dir,
+            "cwd": os.getcwd()
+        }), 404
+
+    files = []
+    for name in os.listdir(base_dir):
+        path = os.path.join(base_dir, name)
+        if os.path.isfile(path):
+            files.append({
+                "name": name,
+                "size": os.path.getsize(path),
+                "allowed": allowed_file(name),
+                "urls": {
+                    "feeds": f"/feeds/{name}",
+                    "static": f"/static/feeds/{name}",
+                    "api": f"/api/static/feeds/{name}"
+                }
+            })
+
+    return jsonify({
+        "base_dir": base_dir,
+        "cwd": os.getcwd(),
+        "total_files": len(files),
+        "files": sorted(files, key=lambda x: x["name"])
+    }), 200
+
+
+@bp.get("/api/feeds/files/test")
+def test_feeds_routes():
+    """
+    Testa as rotas de FEEDS (similar ao /api/files/test)
+    """
+    base_dir = get_base_dir("feeds/dist")
+    results = {
+        "base_directory": base_dir,
+        "cwd": os.getcwd(),
+        "directory_exists": os.path.exists(base_dir),
+        "routes": {
+            "/feeds": "SPA index.html",
+            "/feeds/<filename>": "Assets do build com fallback SPA",
+            "/static/feeds/<filename>": "Serve direto arquivos estáticos",
+            "/api/static/feeds/<filename>": "Serve via API",
+            "/api/feeds/files/list": "Lista arquivos disponíveis",
+            "/api/feeds/files/test": "Testa as rotas"
+        },
+        "allowed_extensions": list(ALLOWED_EXTENSIONS),
+        "available_files": []
+    }
+
+    if os.path.exists(base_dir):
+        for name in os.listdir(base_dir):
+            p = os.path.join(base_dir, name)
+            if os.path.isfile(p):
+                results["available_files"].append({
+                    "name": name,
+                    "size_bytes": os.path.getsize(p),
+                    "allowed": allowed_file(name),
+                    "urls": {
+                        "feeds": f"/feeds/{name}",
+                        "static": f"/static/feeds/{name}",
+                        "api": f"/api/static/feeds/{name}"
+                    }
+                })
+    return jsonify(results), 200
+
+
+# ======================================================================
+# INSTAGRAM (mantidos do seu arquivo original)  ------------------------
+# ======================================================================
 
 @bp.get("/static/instagram/<path:filename>")
 def serve_static_instagram(filename):
@@ -60,53 +248,21 @@ def serve_static_instagram(filename):
     Serve arquivos estáticos da pasta static/instagram
     Usa: /static/instagram/index.html ou /static/instagram/core-service-p-boot.json?v=123
     """
-    # Remove query parameters do filename (ex: ?v=123)
     clean_filename = filename.split('?')[0]
-    logger.info(f"Servindo arquivo estático: {clean_filename} (original: {filename})")
+    logger.info("Servindo arquivo estático: %s (original: %s)", clean_filename, filename)
 
     if not allowed_file(clean_filename):
-        logger.warning(f"Extensão não permitida: {clean_filename}")
+        logger.warning("Extensão não permitida: %s", clean_filename)
         abort(404)
 
     try:
-        base_dir = get_base_dir()
-
-        # Validar path traversal
-        requested_path = os.path.abspath(os.path.join(base_dir, clean_filename))
-        if not requested_path.startswith(base_dir):
-            logger.error(f"Tentativa de path traversal: {clean_filename}")
-            abort(403)
-
-        # Verificar se arquivo existe
-        if not os.path.exists(requested_path):
-            logger.warning(f"Arquivo não encontrado: {requested_path}")
-            logger.info(f"Base dir: {base_dir}")
-            if os.path.exists(base_dir):
-                try:
-                    files = os.listdir(base_dir)
-                    logger.info(f"Arquivos disponíveis: {files}")
-                except Exception as e:
-                    logger.error(f"Erro ao listar: {e}")
-                    abort(404)
-
-        logger.info(f"Enviando: {requested_path}")
-        print(send_from_directory(base_dir, clean_filename))
-        # Usar send_from_directory
-        response = make_response(send_from_directory(base_dir, clean_filename))
-
-        # Adicionar headers apropriados
-        if clean_filename.endswith('.json'):
-            response.headers['Content-Type'] = 'application/json'
-        elif clean_filename.endswith('.js'):
-            response.headers['Content-Type'] = 'application/javascript'
-
-        # Permitir cache (mas não abusar por causa do cache busting com ?v=)
-        response.headers['Cache-Control'] = 'public, max-age=3600'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-
-        return response
+        base_dir = get_base_dir("instagram")
+        resp, not_found = _safe_send(base_dir, clean_filename)
+        if not_found:
+            abort(404)
+        return resp
     except Exception as e:
-        logger.error(f"Erro ao servir arquivo estático: {e}", exc_info=True)
+        logger.error("Erro ao servir arquivo estático: %s", e, exc_info=True)
         abort(500)
 
 
@@ -117,30 +273,20 @@ def serve_via_api(filename):
     Usa: /api/static/instagram/core-service-p-boot.json
     """
     clean_filename = filename.split('?')[0]
-    logger.info(f"Servindo via API: {clean_filename}")
+    logger.info("Servindo via API: %s", clean_filename)
 
     if not allowed_file(clean_filename):
-        logger.warning(f"Extensão não permitida: {clean_filename}")
+        logger.warning("Extensão não permitida: %s", clean_filename)
         return jsonify({"error": "File type not allowed"}), 404
 
     try:
-        base_dir = get_base_dir()
-
-        requested_path = os.path.abspath(os.path.join(base_dir, clean_filename))
-        if not requested_path.startswith(base_dir):
-            logger.error(f"Tentativa de path traversal: {clean_filename}")
-            return jsonify({"error": "Access denied"}), 403
-
-        if not os.path.exists(requested_path):
-            logger.warning(f"Arquivo não encontrado: {requested_path}")
+        base_dir = get_base_dir("instagram")
+        resp, not_found = _safe_send(base_dir, clean_filename)
+        if not_found:
             return jsonify({"error": "File not found"}), 404
-
-        logger.info(f"Enviando via API: {requested_path}")
-        response = make_response(send_from_directory(base_dir, clean_filename))
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
+        return resp
     except Exception as e:
-        logger.error(f"Erro ao servir arquivo via API: {e}", exc_info=True)
+        logger.error("Erro ao servir arquivo via API: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -152,20 +298,20 @@ def mock_posts():
     """
     logger.info("Servindo dados mockados")
     try:
-        base_dir = get_base_dir()
+        base_dir = get_base_dir("instagram")
         json_file = os.path.join(base_dir, "mock_posts.json")
 
         if not os.path.exists(json_file):
-            logger.warning(f"Arquivo mock não encontrado: {json_file}")
+            logger.warning("Arquivo mock não encontrado: %s", json_file)
             return jsonify({"code": 200, "payload": []}), 200
 
-        logger.info(f"Enviando mock posts: {json_file}")
-        response = make_response(send_from_directory(base_dir, "mock_posts.json"))
-        response.headers['Content-Type'] = 'application/json'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
+        logger.info("Enviando mock posts: %s", json_file)
+        resp, not_found = _safe_send(base_dir, "mock_posts.json")
+        if not_found:
+            return jsonify({"code": 404, "error": "mock_posts.json not found"}), 404
+        return resp
     except Exception as e:
-        logger.error(f"Erro ao servir mock posts: {e}", exc_info=True)
+        logger.error("Erro ao servir mock posts: %s", e, exc_info=True)
         return jsonify({"code": 500, "error": str(e)}), 500
 
 
@@ -177,35 +323,35 @@ def mock_boot():
     """
     logger.info("Servindo dados de boot")
     try:
-        base_dir = get_base_dir()
+        base_dir = get_base_dir("instagram")
         json_file = os.path.join(base_dir, "core-service-p-boot.json")
 
         if not os.path.exists(json_file):
-            logger.warning(f"Arquivo boot não encontrado: {json_file}")
+            logger.warning("Arquivo boot não encontrado: %s", json_file)
             return jsonify({"code": 200, "payload": {"initialized": True}}), 200
 
-        logger.info(f"Enviando boot data: {json_file}")
-        response = make_response(send_from_directory(base_dir, "core-service-p-boot.json"))
-        response.headers['Content-Type'] = 'application/json'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
+        logger.info("Enviando boot data: %s", json_file)
+        resp, not_found = _safe_send(base_dir, "core-service-p-boot.json")
+        if not_found:
+            return jsonify({"code": 404, "error": "core-service-p-boot.json not found"}), 404
+        return resp
     except Exception as e:
-        logger.error(f"Erro ao servir boot data: {e}", exc_info=True)
+        logger.error("Erro ao servir boot data: %s", e, exc_info=True)
         return jsonify({"code": 500, "error": str(e)}), 500
 
 
 @bp.get("/api/files/list")
 def list_files():
     """
-    Endpoint para listar arquivos disponíveis (DEBUG)
+    Endpoint para listar arquivos disponíveis (DEBUG) de static/instagram
     Usa: /api/files/list
     """
     logger.info("Listando arquivos disponíveis")
     try:
-        base_dir = get_base_dir()
+        base_dir = get_base_dir("instagram")
 
         if not os.path.exists(base_dir):
-            logger.warning(f"Diretório não existe: {base_dir}")
+            logger.warning("Diretório não existe: %s", base_dir)
             return jsonify({
                 "error": "Directory not found",
                 "base_dir": base_dir,
@@ -220,10 +366,15 @@ def list_files():
                 files.append({
                     "name": filename,
                     "size": size,
-                    "allowed": allowed_file(filename)
+                    "allowed": allowed_file(filename),
+                    "urls": {
+                        "static": f"/static/instagram/{filename}",
+                        "api": f"/api/static/instagram/{filename}",
+                        "with_cache_bust": f"/static/instagram/{filename}?v=123"
+                    }
                 })
 
-        logger.info(f"Total de arquivos: {len(files)}")
+        logger.info("Total de arquivos: %d", len(files))
         return jsonify({
             "base_dir": base_dir,
             "cwd": os.getcwd(),
@@ -231,19 +382,19 @@ def list_files():
             "files": sorted(files, key=lambda x: x['name'])
         }), 200
     except Exception as e:
-        logger.error(f"Erro ao listar arquivos: {e}", exc_info=True)
+        logger.error("Erro ao listar arquivos: %s", e, exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
 @bp.get("/api/files/test")
 def test_routes():
     """
-    Endpoint para testar as rotas de arquivos estáticos
+    Endpoint para testar as rotas de arquivos estáticos (instagram)
     Usa: /api/files/test
     """
     logger.info("Testando rotas de arquivos estáticos")
 
-    base_dir = get_base_dir()
+    base_dir = get_base_dir("instagram")
 
     results = {
         "base_directory": base_dir,
@@ -292,6 +443,6 @@ def test_routes():
                     })
         except Exception as e:
             results["error_listing_files"] = str(e)
-            logger.error(f"Erro ao listar arquivos para teste: {e}")
+            logger.error("Erro ao listar arquivos para teste: %s", e)
 
     return jsonify(results), 200
