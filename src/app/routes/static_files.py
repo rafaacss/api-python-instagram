@@ -30,6 +30,7 @@ def get_base_dir():
     """
 
     possible_paths = [
+        "src/app/static/instagram",
         "/app/static/instagram",
         "/static/instagram",
         "/app/src/static/instagram",
@@ -89,7 +90,7 @@ def serve_static_instagram(filename):
                     abort(404)
 
         logger.info(f"Enviando: {requested_path}")
-
+        print(send_from_directory(base_dir, clean_filename))
         # Usar send_from_directory
         response = make_response(send_from_directory(base_dir, clean_filename))
 
@@ -253,7 +254,7 @@ def test_routes():
             "/static/instagram": os.path.exists("/static/instagram"),
             "/app/src/static/instagram": os.path.exists("/app/src/static/instagram"),
             "static/instagram": os.path.exists("static/instagram"),
-             "src/app/static/instagram": os.path.exists("src/app/static/instagram"),
+            "src/app/static/instagram": os.path.exists("src/app/static/instagram"),
             "./static/instagram": os.path.exists("./static/instagram"),
         },
         "routes": {
