@@ -11534,7 +11534,7 @@
                                     const image = window.InstagramConfig.url('/api/instagram/media_proxy?id='+(this.data?.id ?? ''));
                                     this.view.image.setAttribute("src", image);
                                     this.getImageSrc(videoUrl)
-                                    this.data?.images = [{'url': Instagram.config'https://i.imgur.com/0000000.jpg'}];
+
                                 }
 
                                 this.view.image.setAttribute("src", imageSrc);
