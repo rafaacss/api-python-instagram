@@ -11534,10 +11534,10 @@
                                     const image = window.InstagramConfig.url('/api/instagram/media_proxy?id='+(this.data?.id ?? ''));
                                     this.view.image.setAttribute("src", image);
                                     this.getImageSrc(videoUrl)
-
+                                } else {
+                                    this.view.image.setAttribute("src", imageSrc);
                                 }
 
-                                this.view.image.setAttribute("src", imageSrc);
                                 this.view.image.setAttribute("alt", `${this.data?.text?.slice(0, 77) ?? "Imagem"}...`);
 
                                 this.view.image.addEventListener("load", (e => {
