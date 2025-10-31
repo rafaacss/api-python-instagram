@@ -11066,7 +11066,7 @@
             hasNext() {
                 return this.items.length > this.cursor
             }
-            prepareData(e) {
+           prepareData(e) {
             const t = [];
             return e.forEach((e => {
                 var n;
@@ -11213,7 +11213,8 @@
                 const l = e.caption ? e.caption.match(/#([\w\p{L}]+)/giu) : void 0;
                 r.tags = (null === l || void 0 === l ? void 0 : l.length) > 0 ? l.map((e => e.slice(1))) : [], t.push(r)
             })), t
-        }
+}
+            /*fim prepareData*/
             destroy() {
                 this.destroyed = !0, clearTimeout(this.fetchTimeout)
             }

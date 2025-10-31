@@ -183,6 +183,8 @@ def posts():
         for post in api_data.get("data", []):
             ptype = (post.get("media_type") or "").upper()
             media_items = []
+            print(post)
+            print(ptype)
 
             if ptype in ("IMAGE", "VIDEO"):
                 mid = post.get("id")
