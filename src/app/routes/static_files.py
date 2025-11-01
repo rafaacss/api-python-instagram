@@ -99,6 +99,19 @@ def _safe_send(base_dir: str, clean_filename: str):
 # FEEDS (widget Vue compilado em static/feeds/dist)  --------------------
 # ======================================================================
 
+@bp.get("/instagram-widget-example")
+def instagram_widget_example():
+    """
+    Exemplo de uso do widget similar ao elfsight
+    Rota separada para evitar conflito com /feeds/<path:filename>
+    """
+    base_dir = get_base_dir("feeds")
+    resp, not_found = _safe_send(base_dir, "widget-example.html")
+    if not_found:
+        abort(404)
+    return resp
+
+
 @bp.get("/feeds")
 def feeds_index():
     """
@@ -106,18 +119,6 @@ def feeds_index():
     """
     base_dir = get_base_dir("feeds/dist")
     resp, not_found = _safe_send(base_dir, "index.html")
-    if not_found:
-        abort(404)
-    return resp
-
-
-@bp.get("/feeds/example")
-def feeds_example():
-    """
-    Exemplo de uso do widget similar ao elfsight
-    """
-    base_dir = get_base_dir("feeds")
-    resp, not_found = _safe_send(base_dir, "widget-example.html")
     if not_found:
         abort(404)
     return resp
@@ -148,7 +149,9 @@ def serve_static_feeds(filename):
     Alternativa direta: /static/feeds/... (útil para assets absolutos)
     """
     clean = filename.split('?')[0]
-    if not allowed_file(clean):
+
+    # Arquivos sem extensão são permitidos (podem ser rotas SPA)
+    if '.' in clean and not allowed_file(clean):
         logger.warning("Extensão não permitida: %s", clean)
         abort(404)
 

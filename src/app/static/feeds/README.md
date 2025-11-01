@@ -73,7 +73,7 @@ npm run build
 ## 🌐 Rotas Disponíveis
 
 - `/feeds` - SPA de teste do widget
-- `/feeds/example` - Página de exemplo de uso (similar ao elfsight)
+- `/instagram-widget-example` - Página de exemplo de uso (similar ao elfsight)
 - `/static/feeds/instagram-feed-widget.js` - Script do widget
 - `/static/feeds/assets/*` - Assets (CSS, JS chunks)
 
