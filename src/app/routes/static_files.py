@@ -111,6 +111,18 @@ def feeds_index():
     return resp
 
 
+@bp.get("/feeds/example")
+def feeds_example():
+    """
+    Exemplo de uso do widget similar ao elfsight
+    """
+    base_dir = get_base_dir("feeds")
+    resp, not_found = _safe_send(base_dir, "widget-example.html")
+    if not_found:
+        abort(404)
+    return resp
+
+
 @bp.get("/feeds/<path:filename>")
 def feeds_assets(filename):
     """
