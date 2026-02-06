@@ -6,6 +6,9 @@
     <title>k6 PHP Benchmark - Gran Cursos</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,194 +17,170 @@
             color: #e2e8f0;
             min-height: 100vh;
         }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 20px; }
 
         header {
             text-align: center;
-            padding: 30px 0 20px;
+            padding: 24px 0 18px;
             border-bottom: 1px solid #1e293b;
-            margin-bottom: 30px;
-        }
-        header h1 { font-size: 28px; color: #38bdf8; margin-bottom: 6px; }
-        header p { color: #94a3b8; font-size: 14px; }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
             margin-bottom: 24px;
         }
+        header h1 { font-size: 26px; color: #38bdf8; margin-bottom: 4px; }
+        header p { color: #94a3b8; font-size: 13px; }
+
+        .nav-tabs {
+            display: flex; gap: 4px; margin-bottom: 24px;
+            background: #1e293b; border-radius: 10px; padding: 4px;
+        }
+        .nav-tab {
+            flex: 1; padding: 10px; text-align: center; background: transparent;
+            border: none; color: #94a3b8; border-radius: 8px; cursor: pointer;
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+        }
+        .nav-tab.active { background: #334155; color: #38bdf8; }
+        .nav-tab:hover:not(.active) { color: #e2e8f0; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
         .form-section {
-            background: #1e293b;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #334155;
+            background: #1e293b; border-radius: 10px; padding: 18px; border: 1px solid #334155;
         }
-        .form-section h3 {
-            font-size: 15px;
-            color: #38bdf8;
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .form-section h3 { font-size: 14px; color: #38bdf8; margin-bottom: 12px; }
         .form-section.full-width { grid-column: 1 / -1; }
 
-        .form-group { margin-bottom: 14px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group:last-child { margin-bottom: 0; }
         .form-group label {
-            display: block;
-            font-size: 12px;
-            color: #94a3b8;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
         .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 10px 12px;
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 8px;
-            color: #e2e8f0;
-            font-size: 14px;
-            transition: border-color 0.2s;
+            width: 100%; padding: 9px 11px; background: #0f172a;
+            border: 1px solid #334155; border-radius: 7px; color: #e2e8f0;
+            font-size: 13px; transition: border-color 0.2s;
         }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: #38bdf8;
+            outline: none; border-color: #38bdf8;
         }
-        .form-group textarea { resize: vertical; min-height: 60px; font-family: monospace; }
-        .form-group .hint { font-size: 11px; color: #64748b; margin-top: 3px; }
+        .form-group textarea { resize: vertical; min-height: 50px; font-family: monospace; font-size: 12px; }
+        .form-group .hint { font-size: 10px; color: #64748b; margin-top: 2px; }
 
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 
         .btn {
-            padding: 12px 24px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.2s;
+            padding: 11px 20px; border-radius: 8px; border: none; cursor: pointer;
+            font-size: 13px; font-weight: 600; transition: all 0.2s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, #38bdf8, #818cf8);
-            color: white;
-            width: 100%;
-            font-size: 16px;
-            padding: 14px;
+            background: linear-gradient(135deg, #38bdf8, #818cf8); color: white;
+            width: 100%; font-size: 15px; padding: 13px;
         }
         .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-sm { padding: 7px 14px; font-size: 12px; }
+        .btn-outline { background: transparent; border: 1px solid #334155; color: #94a3b8; }
+        .btn-outline:hover { border-color: #38bdf8; color: #38bdf8; }
+        .btn-danger { background: #7f1d1d; color: #fca5a5; }
+        .btn-success { background: #065f46; color: #34d399; }
 
-        /* Progress */
         .progress-section {
-            background: #1e293b;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 24px;
-            border: 1px solid #334155;
+            background: #1e293b; border-radius: 10px; padding: 18px;
+            margin: 20px 0; border: 1px solid #334155;
         }
-        .progress-bar {
-            height: 6px;
-            background: #334155;
-            border-radius: 3px;
-            overflow: hidden;
-            margin: 12px 0;
-        }
+        .progress-bar { height: 5px; background: #334155; border-radius: 3px; overflow: hidden; margin: 10px 0; }
         .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #38bdf8, #818cf8);
-            border-radius: 3px;
-            transition: width 0.5s ease;
+            height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8);
+            border-radius: 3px; transition: width 0.5s ease;
         }
-        .status-text { color: #94a3b8; font-size: 13px; }
+        .log-console {
+            background: #020617; border: 1px solid #1e293b; border-radius: 8px;
+            padding: 12px; max-height: 200px; overflow-y: auto;
+            font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; margin-top: 10px;
+        }
+        .log-line { color: #64748b; }
+        .log-line .label-74 { color: #f97316; font-weight: 600; }
+        .log-line .label-85 { color: #22d3ee; font-weight: 600; }
+        .log-line .label-sys { color: #a78bfa; font-weight: 600; }
+        .log-line .timestamp { color: #475569; }
 
-        /* Results */
         .results-section {
-            background: #1e293b;
-            border-radius: 12px;
-            padding: 24px;
-            border: 1px solid #334155;
+            background: #1e293b; border-radius: 10px; padding: 20px;
+            border: 1px solid #334155; margin-top: 20px;
         }
-        .results-section h2 { font-size: 20px; color: #38bdf8; margin-bottom: 20px; }
+        .results-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;
+        }
+        .results-header h2 { font-size: 18px; color: #38bdf8; }
+        .export-btns { display: flex; gap: 6px; }
 
         .winner-banner {
-            text-align: center;
-            padding: 16px;
-            background: linear-gradient(135deg, #065f46, #064e3b);
-            border-radius: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #10b981;
+            text-align: center; padding: 14px; border-radius: 10px;
+            margin-bottom: 18px; border: 1px solid;
         }
-        .winner-banner h3 { font-size: 18px; color: #34d399; }
-        .winner-banner p { color: #a7f3d0; font-size: 13px; margin-top: 4px; }
+        .winner-banner.php85 { background: linear-gradient(135deg, #065f46, #064e3b); border-color: #10b981; }
+        .winner-banner.php74 { background: linear-gradient(135deg, #7c2d12, #431407); border-color: #f97316; }
+        .winner-banner h3 { font-size: 16px; }
+        .winner-banner.php85 h3 { color: #34d399; }
+        .winner-banner.php74 h3 { color: #fb923c; }
+        .winner-banner p { color: #d1d5db; font-size: 12px; margin-top: 4px; }
 
-        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
-        .metric-card {
-            background: #0f172a;
-            border-radius: 10px;
-            padding: 16px;
-            text-align: center;
-            border: 1px solid #334155;
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+        .chart-card {
+            background: #0f172a; border-radius: 10px; padding: 16px; border: 1px solid #334155;
         }
-        .metric-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-        .metric-card .values { display: flex; justify-content: center; gap: 20px; margin: 10px 0; }
-        .metric-card .val { font-size: 22px; font-weight: 700; }
-        .metric-card .val small { font-size: 11px; display: block; color: #94a3b8; font-weight: 400; }
-        .metric-card .diff { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
-        .metric-card .diff.positive { background: #064e3b; color: #34d399; }
-        .metric-card .diff.negative { background: #7f1d1d; color: #fca5a5; }
-        .metric-card .winner-tag { font-size: 11px; color: #fbbf24; margin-top: 4px; }
+        .chart-card.full-width { grid-column: 1 / -1; }
+        .chart-card h4 { font-size: 13px; color: #94a3b8; margin-bottom: 10px; text-align: center; }
+        .chart-container { position: relative; height: 260px; }
+
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+        .summary-card {
+            background: #0f172a; border-radius: 8px; padding: 14px;
+            text-align: center; border: 1px solid #334155;
+        }
+        .summary-card .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .summary-card .values { display: flex; justify-content: center; gap: 16px; margin: 8px 0 6px; }
+        .summary-card .val { font-size: 18px; font-weight: 700; }
+        .summary-card .val small { font-size: 10px; display: block; color: #94a3b8; font-weight: 400; }
+        .summary-card .diff { font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-block; }
+        .diff.better { background: #064e3b; color: #34d399; }
+        .diff.worse { background: #7f1d1d; color: #fca5a5; }
+        .diff.neutral { background: #1e293b; color: #94a3b8; }
+        .summary-card .winner-tag { font-size: 10px; color: #fbbf24; margin-top: 2px; }
 
         .php74-color { color: #f97316; }
         .php85-color { color: #22d3ee; }
 
-        .detail-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 16px;
-        }
+        .detail-table { width: 100%; border-collapse: collapse; }
         .detail-table th, .detail-table td {
-            padding: 10px 14px;
-            text-align: left;
-            border-bottom: 1px solid #334155;
-            font-size: 13px;
+            padding: 9px 12px; text-align: left; border-bottom: 1px solid #1e293b; font-size: 12px;
         }
-        .detail-table th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 11px; }
-        .detail-table tr:hover { background: #1e293b; }
+        .detail-table th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; }
+        .detail-table tr:hover td { background: #0f172a; }
+        .detail-table .winner-cell { color: #34d399; font-weight: 600; }
 
-        .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
-        .tab {
-            padding: 8px 16px;
-            background: transparent;
-            border: 1px solid #334155;
-            color: #94a3b8;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
+        .result-tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+        .result-tab {
+            padding: 7px 14px; background: transparent; border: 1px solid #334155;
+            color: #94a3b8; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.15s;
         }
-        .tab.active { background: #334155; color: #e2e8f0; border-color: #38bdf8; }
+        .result-tab.active { background: #334155; color: #e2e8f0; border-color: #38bdf8; }
 
         .history-item {
-            padding: 12px;
-            background: #0f172a;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            border: 1px solid #334155;
-            transition: border-color 0.2s;
+            padding: 10px 14px; background: #0f172a; border-radius: 8px; margin-bottom: 6px;
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid #334155; transition: border-color 0.2s;
         }
         .history-item:hover { border-color: #38bdf8; }
 
         @media (max-width: 768px) {
-            .form-grid { grid-template-columns: 1fr; }
-            .metrics-grid { grid-template-columns: 1fr; }
+            .form-grid, .charts-grid { grid-template-columns: 1fr; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
             .form-row, .form-row-3 { grid-template-columns: 1fr; }
+            .chart-card.full-width { grid-column: 1; }
+        }
+        @media print {
+            body { background: white; color: black; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -213,187 +192,266 @@
             <p>Compare performance entre PHP 7.4 e PHP 8.5 - Gran Cursos Online</p>
         </header>
 
-        <!-- Form -->
-        <div class="form-grid">
-            <!-- URLs -->
-            <div class="form-section">
-                <h3>&#9881; Ambientes</h3>
-                <div class="form-group">
-                    <label>URL PHP 7.4</label>
-                    <input v-model="form.url_php74" type="url"
-                           placeholder="https://dev.grancursosonline.com.br">
-                </div>
-                <div class="form-group">
-                    <label>URL PHP 8.5</label>
-                    <input v-model="form.url_php85" type="url"
-                           placeholder="https://php8-5.grancursosonline.com.br">
-                </div>
-            </div>
+        <div class="nav-tabs no-print">
+            <button class="nav-tab" :class="{ active: page === 'benchmark' }" @click="page = 'benchmark'">
+                Novo Benchmark
+            </button>
+            <button class="nav-tab" :class="{ active: page === 'history' }" @click="page = 'history'; loadHistory()">
+                Historico ({{ history.length }})
+            </button>
+        </div>
 
-            <!-- Test Config -->
-            <div class="form-section">
-                <h3>&#9889; Configuracao do Teste</h3>
-                <div class="form-group">
-                    <label>Tipo de Teste</label>
-                    <select v-model="form.test_type">
-                        <option value="homepage">Homepage (carregamento inicial)</option>
-                        <option value="endpoints">Endpoints especificos</option>
-                        <option value="authenticated">Autenticado (com login)</option>
-                        <option value="full">Completo (homepage + endpoints)</option>
-                    </select>
-                </div>
-                <div class="form-row-3">
+        <!-- ===== BENCHMARK PAGE ===== -->
+        <div v-if="page === 'benchmark'">
+            <div class="form-grid no-print">
+                <div class="form-section">
+                    <h3>Ambientes</h3>
                     <div class="form-group">
-                        <label>Usuarios Virtuais (VUs)</label>
-                        <input v-model.number="form.vus" type="number" min="1" max="500">
+                        <label>URL PHP 7.4</label>
+                        <input v-model="form.url_php74" type="url" placeholder="https://dev.grancursosonline.com.br">
                     </div>
                     <div class="form-group">
-                        <label>Duracao</label>
-                        <select v-model="form.duration">
-                            <option value="10s">10 segundos</option>
-                            <option value="30s">30 segundos</option>
-                            <option value="1m">1 minuto</option>
-                            <option value="2m">2 minutos</option>
-                            <option value="5m">5 minutos</option>
+                        <label>URL PHP 8.5</label>
+                        <input v-model="form.url_php85" type="url" placeholder="https://php8-5.grancursosonline.com.br">
+                    </div>
+                </div>
+                <div class="form-section">
+                    <h3>Configuracao do Teste</h3>
+                    <div class="form-group">
+                        <label>Tipo de Teste</label>
+                        <select v-model="form.test_type">
+                            <option value="homepage">Homepage (carregamento inicial)</option>
+                            <option value="endpoints">Endpoints especificos</option>
+                            <option value="authenticated">Autenticado (com login)</option>
+                            <option value="full">Completo (homepage + endpoints)</option>
                         </select>
                     </div>
+                    <div class="form-row-3">
+                        <div class="form-group">
+                            <label>VUs (usuarios)</label>
+                            <input v-model.number="form.vus" type="number" min="1" max="500">
+                        </div>
+                        <div class="form-group">
+                            <label>Duracao</label>
+                            <select v-model="form.duration">
+                                <option value="10s">10 seg</option>
+                                <option value="30s">30 seg</option>
+                                <option value="1m">1 min</option>
+                                <option value="2m">2 min</option>
+                                <option value="5m">5 min</option>
+                                <option value="10m">10 min</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sleep (s)</label>
+                            <input v-model.number="form.sleep" type="number" min="0" max="5" step="0.1">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section" v-if="form.test_type !== 'homepage'">
+                    <h3>Endpoints</h3>
                     <div class="form-group">
-                        <label>Sleep (s)</label>
-                        <input v-model.number="form.sleep" type="number" min="0" max="5" step="0.1">
+                        <label>Endpoints para testar</label>
+                        <textarea v-model="form.endpoints" placeholder="/api/cursos,/api/alunos,/dashboard"></textarea>
+                        <div class="hint">Separar por virgula. Ex: /api/cursos,/painel</div>
+                    </div>
+                </div>
+                <div class="form-section" v-if="form.test_type === 'authenticated'">
+                    <h3>Autenticacao</h3>
+                    <div class="form-group">
+                        <label>URL de Login</label>
+                        <input v-model="form.login_url" type="url" placeholder="https://dev.grancursosonline.com.br/api/auth/login">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Usuario / Email</label>
+                            <input v-model="form.login_user" type="text" placeholder="usuario@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label>Senha</label>
+                            <input v-model="form.login_pass" type="password">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Campo usuario (payload)</label>
+                            <input v-model="form.login_user_field" type="text" placeholder="email">
+                        </div>
+                        <div class="form-group">
+                            <label>Campo senha (payload)</label>
+                            <input v-model="form.login_pass_field" type="text" placeholder="password">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Endpoints -->
-            <div class="form-section" v-if="form.test_type !== 'homepage'">
-                <h3>&#128279; Endpoints</h3>
-                <div class="form-group">
-                    <label>Endpoints para testar</label>
-                    <textarea v-model="form.endpoints"
-                              placeholder="/api/cursos,/api/alunos,/dashboard,/login"></textarea>
-                    <div class="hint">Separar por virgula. Ex: /api/cursos,/api/users,/painel</div>
+            <button class="btn btn-primary no-print" @click="runBenchmark" :disabled="loading">
+                {{ loading ? statusText : 'Executar Benchmark Comparativo' }}
+            </button>
+
+            <!-- Progress + Live Logs -->
+            <div class="progress-section no-print" v-if="loading">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 13px; color: #94a3b8;">{{ statusText }}</span>
+                    <span style="font-size: 13px; color: #38bdf8; font-weight: 600;">{{ progressPercent }}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+                </div>
+                <div class="log-console" ref="logConsole">
+                    <div class="log-line" v-for="(log, i) in logs" :key="i">
+                        <span class="timestamp">[{{ log.time }}]</span>
+                        <span :class="log.labelClass">{{ log.label }}</span>
+                        {{ log.text }}
+                    </div>
+                    <div class="log-line" v-if="logs.length === 0" style="color: #475569;">
+                        Aguardando logs do k6...
+                    </div>
                 </div>
             </div>
 
-            <!-- Login -->
-            <div class="form-section" v-if="form.test_type === 'authenticated'">
-                <h3>&#128274; Autenticacao</h3>
-                <div class="form-group">
-                    <label>URL de Login</label>
-                    <input v-model="form.login_url" type="url"
-                           placeholder="https://dev.grancursosonline.com.br/api/auth/login">
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Usuario / Email</label>
-                        <input v-model="form.login_user" type="text" placeholder="usuario@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Senha</label>
-                        <input v-model="form.login_pass" type="password" placeholder="********">
+            <!-- ===== RESULTS ===== -->
+            <div class="results-section" v-if="result" id="results-content">
+                <div class="results-header">
+                    <h2>Relatorio de Benchmark</h2>
+                    <div class="export-btns no-print">
+                        <button class="btn btn-sm btn-outline" @click="exportJSON">JSON</button>
+                        <button class="btn btn-sm btn-outline" @click="exportCSV">CSV</button>
+                        <button class="btn btn-sm btn-success" @click="exportPDF">PDF</button>
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Campo do usuario (payload)</label>
-                        <input v-model="form.login_user_field" type="text" placeholder="email">
+
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 14px; display: flex; gap: 20px; flex-wrap: wrap;">
+                    <span>Data: {{ formatDate(result.timestamp) }}</span>
+                    <span>Tipo: {{ result.config?.test_type || '-' }}</span>
+                    <span>VUs: {{ result.config?.vus || '-' }}</span>
+                    <span>Duracao: {{ result.config?.duration || '-' }}</span>
+                    <span>ID: {{ result.compare_id }}</span>
+                </div>
+
+                <div class="winner-banner" :class="overallWinner === 'PHP 8.5' ? 'php85' : 'php74'" v-if="overallWinner">
+                    <h3>{{ overallWinner }} venceu o benchmark!</h3>
+                    <p>{{ winnerDescription }}</p>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="summary-grid">
+                    <div class="summary-card" v-for="key in topMetrics" :key="key" v-if="result.summary && result.summary[key]">
+                        <div class="label">{{ metricLabels[key] }}</div>
+                        <div class="values">
+                            <div class="val php74-color">
+                                {{ fmtNum(result.summary[key].php74) }}
+                                <small>PHP 7.4</small>
+                            </div>
+                            <div class="val php85-color">
+                                {{ fmtNum(result.summary[key].php85) }}
+                                <small>PHP 8.5</small>
+                            </div>
+                        </div>
+                        <div class="diff" :class="diffClass(key, result.summary[key].diff_percent)">
+                            {{ result.summary[key].diff_percent > 0 ? '+' : '' }}{{ result.summary[key].diff_percent }}%
+                        </div>
+                        <div class="winner-tag">{{ result.summary[key].winner }}</div>
                     </div>
-                    <div class="form-group">
-                        <label>Campo da senha (payload)</label>
-                        <input v-model="form.login_pass_field" type="text" placeholder="password">
+                </div>
+
+                <!-- Result tabs -->
+                <div class="result-tabs no-print">
+                    <button class="result-tab" :class="{ active: resultTab === 'charts' }" @click="resultTab = 'charts'">
+                        Graficos
+                    </button>
+                    <button class="result-tab" :class="{ active: resultTab === 'table' }" @click="resultTab = 'table'">
+                        Tabela Completa
+                    </button>
+                    <button class="result-tab" :class="{ active: resultTab === 'raw74' }" @click="resultTab = 'raw74'">
+                        PHP 7.4 Raw
+                    </button>
+                    <button class="result-tab" :class="{ active: resultTab === 'raw85' }" @click="resultTab = 'raw85'">
+                        PHP 8.5 Raw
+                    </button>
+                </div>
+
+                <!-- Charts -->
+                <div v-show="resultTab === 'charts'">
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <h4>Tempo de Resposta (ms)</h4>
+                            <div class="chart-container"><canvas ref="chartResponseTime"></canvas></div>
+                        </div>
+                        <div class="chart-card">
+                            <h4>Throughput e Iteracoes</h4>
+                            <div class="chart-container"><canvas ref="chartThroughput"></canvas></div>
+                        </div>
+                        <div class="chart-card">
+                            <h4>Distribuicao de Latencia (ms)</h4>
+                            <div class="chart-container"><canvas ref="chartLatencyDist"></canvas></div>
+                        </div>
+                        <div class="chart-card">
+                            <h4>Performance Geral (score normalizado)</h4>
+                            <div class="chart-container"><canvas ref="chartRadar"></canvas></div>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Full Table -->
+                <div v-show="resultTab === 'table'">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Metrica</th>
+                                <th style="color: #f97316;">PHP 7.4</th>
+                                <th style="color: #22d3ee;">PHP 8.5</th>
+                                <th>Diferenca</th>
+                                <th>Vencedor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="key in allMetricKeys" :key="key" v-if="result.summary && result.summary[key]">
+                                <td>{{ metricLabels[key] || key }}</td>
+                                <td>{{ fmtNum(result.summary[key].php74) }}</td>
+                                <td>{{ fmtNum(result.summary[key].php85) }}</td>
+                                <td>
+                                    <span class="diff" :class="diffClass(key, result.summary[key].diff_percent)">
+                                        {{ result.summary[key].diff_percent > 0 ? '+' : '' }}{{ result.summary[key].diff_percent }}%
+                                    </span>
+                                </td>
+                                <td class="winner-cell">{{ result.summary[key].winner }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Raw data -->
+                <div v-show="resultTab === 'raw74' || resultTab === 'raw85'">
+                    <pre style="background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 14px; font-size: 11px; overflow-x: auto; max-height: 400px; color: #94a3b8;">{{ JSON.stringify(resultTab === 'raw74' ? result.php74 : result.php85, null, 2) }}</pre>
                 </div>
             </div>
         </div>
 
-        <!-- Run Button -->
-        <button class="btn btn-primary" @click="runBenchmark" :disabled="loading">
-            {{ loading ? statusText : 'Executar Benchmark Comparativo' }}
-        </button>
-
-        <!-- Progress -->
-        <div class="progress-section" v-if="loading" style="margin-top: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="status-text">{{ statusText }}</span>
-                <span class="status-text">{{ progressPercent }}%</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
-            </div>
-        </div>
-
-        <!-- Results -->
-        <div class="results-section" v-if="result" style="margin-top: 24px;">
-            <h2>Resultado da Comparacao</h2>
-
-            <!-- Winner -->
-            <div class="winner-banner" v-if="overallWinner">
-                <h3>{{ overallWinner }} venceu!</h3>
-                <p>{{ winnerDescription }}</p>
-            </div>
-
-            <!-- Summary Metrics -->
-            <div class="metrics-grid">
-                <div class="metric-card" v-for="(metric, key) in result.summary" :key="key">
-                    <div class="label">{{ metricLabels[key] || key }}</div>
-                    <div class="values">
-                        <div class="val php74-color">
-                            {{ formatNumber(metric.php74) }}
-                            <small>PHP 7.4</small>
-                        </div>
-                        <div class="val php85-color">
-                            {{ formatNumber(metric.php85) }}
-                            <small>PHP 8.5</small>
+        <!-- ===== HISTORY PAGE ===== -->
+        <div v-if="page === 'history'">
+            <div class="results-section">
+                <div class="results-header">
+                    <h2>Historico de Testes</h2>
+                    <span style="font-size: 12px; color: #64748b;">{{ history.length }} resultados</span>
+                </div>
+                <div v-if="history.length === 0" style="color: #64748b; text-align: center; padding: 40px;">
+                    Nenhum resultado salvo ainda. Execute um benchmark primeiro.
+                </div>
+                <div class="history-item" v-for="item in history" :key="item.filename">
+                    <div @click="loadHistoryResult(item.filename)" style="flex: 1; cursor: pointer;">
+                        <strong style="color: #38bdf8;">{{ item.compare_id || item.test_id || item.filename }}</strong>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                            {{ formatDate(item.timestamp) }}
+                            <span v-if="item.config" style="margin-left: 8px;">
+                                {{ item.config.test_type }} | {{ item.config.vus }} VUs | {{ item.config.duration }}
+                            </span>
                         </div>
                     </div>
-                    <div class="diff" :class="getDiffClass(key, metric.diff_percent)">
-                        {{ metric.diff_percent > 0 ? '+' : '' }}{{ metric.diff_percent }}%
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-sm btn-outline" @click="loadHistoryResult(item.filename)">Ver</button>
+                        <button class="btn btn-sm btn-danger" @click="deleteResult(item.filename)">X</button>
                     </div>
-                    <div class="winner-tag">{{ metric.winner }}</div>
-                </div>
-            </div>
-
-            <!-- Detail tabs -->
-            <div class="tabs">
-                <button class="tab" :class="{ active: activeTab === 'php74' }" @click="activeTab = 'php74'">
-                    PHP 7.4 - Detalhes
-                </button>
-                <button class="tab" :class="{ active: activeTab === 'php85' }" @click="activeTab = 'php85'">
-                    PHP 8.5 - Detalhes
-                </button>
-                <button class="tab" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'; loadHistory()">
-                    Historico
-                </button>
-            </div>
-
-            <!-- Detail Table -->
-            <table class="detail-table" v-if="activeTab !== 'history'">
-                <thead>
-                    <tr>
-                        <th>Metrica</th>
-                        <th>Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(row, idx) in getDetailRows(activeTab)" :key="idx">
-                        <td>{{ row.label }}</td>
-                        <td>{{ row.value }}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- History -->
-            <div v-if="activeTab === 'history'">
-                <div v-if="history.length === 0" style="color: #64748b; text-align: center; padding: 20px;">
-                    Nenhum resultado salvo ainda
-                </div>
-                <div class="history-item" v-for="item in history" :key="item.filename"
-                     @click="loadResult(item.filename)">
-                    <div>
-                        <strong>{{ item.compare_id || item.test_id }}</strong>
-                        <div style="font-size: 12px; color: #64748b;">{{ item.timestamp }}</div>
-                    </div>
-                    <div style="font-size: 12px; color: #94a3b8;">{{ item.filename }}</div>
                 </div>
             </div>
         </div>
@@ -401,210 +459,331 @@
 </div>
 
 <script>
-const { createApp, ref, computed } = Vue;
+const { createApp, ref, computed, watch, nextTick } = Vue;
 
 createApp({
     setup() {
         const API_URL = window.location.protocol + '//' + window.location.hostname + ':5000';
+        const page = ref('benchmark');
+        const resultTab = ref('charts');
 
         const form = ref({
             url_php74: 'https://dev.grancursosonline.com.br',
             url_php85: 'https://php8-5.grancursosonline.com.br',
-            test_type: 'homepage',
-            vus: 10,
-            duration: '30s',
-            sleep: 0.5,
-            endpoints: '',
-            login_url: '',
-            login_user: '',
-            login_pass: '',
-            login_user_field: 'email',
-            login_pass_field: 'password',
+            test_type: 'homepage', vus: 10, duration: '30s', sleep: 0.5,
+            endpoints: '', login_url: '', login_user: '', login_pass: '',
+            login_user_field: 'email', login_pass_field: 'password',
         });
 
         const loading = ref(false);
         const statusText = ref('');
         const progressPercent = ref(0);
         const result = ref(null);
-        const activeTab = ref('php74');
+        const logs = ref([]);
         const history = ref([]);
+        const logConsole = ref(null);
 
+        const chartResponseTime = ref(null);
+        const chartThroughput = ref(null);
+        const chartLatencyDist = ref(null);
+        const chartRadar = ref(null);
+        let chartInstances = {};
+
+        const topMetrics = ['avg_response_ms', 'p95_response_ms', 'requests_per_sec', 'error_rate'];
+        const allMetricKeys = [
+            'avg_response_ms', 'median_response_ms', 'min_response_ms', 'max_response_ms',
+            'p90_response_ms', 'p95_response_ms', 'requests_per_sec', 'total_requests',
+            'error_rate', 'iterations', 'iterations_per_sec',
+        ];
         const metricLabels = {
-            avg_response_ms: 'Tempo Medio (ms)',
-            p95_response_ms: 'P95 Response (ms)',
-            requests_per_sec: 'Requests/seg',
+            avg_response_ms: 'Tempo Medio (ms)', median_response_ms: 'Mediana (ms)',
+            p90_response_ms: 'P90 (ms)', p95_response_ms: 'P95 (ms)',
+            min_response_ms: 'Minimo (ms)', max_response_ms: 'Maximo (ms)',
+            requests_per_sec: 'Requests/seg', total_requests: 'Total Requests',
+            error_rate: 'Taxa de Erro (%)', iterations: 'Iteracoes', iterations_per_sec: 'Iteracoes/seg',
         };
+        const lowerIsBetter = new Set([
+            'avg_response_ms', 'median_response_ms', 'p90_response_ms', 'p95_response_ms',
+            'min_response_ms', 'max_response_ms', 'error_rate',
+        ]);
 
         const overallWinner = computed(() => {
-            if (!result.value || !result.value.summary) return null;
-            let php85Wins = 0;
-            let php74Wins = 0;
+            if (!result.value?.summary) return null;
+            let s85 = 0, s74 = 0;
             for (const m of Object.values(result.value.summary)) {
-                if (m.winner === 'PHP 8.5') php85Wins++;
-                else php74Wins++;
+                if (m.winner === 'PHP 8.5') s85++; else s74++;
             }
-            return php85Wins > php74Wins ? 'PHP 8.5' : 'PHP 7.4';
+            return s85 > s74 ? 'PHP 8.5' : 'PHP 7.4';
         });
 
         const winnerDescription = computed(() => {
-            if (!result.value || !result.value.summary) return '';
+            if (!result.value?.summary) return '';
             const s = result.value.summary;
             const avgDiff = Math.abs(s.avg_response_ms?.diff_percent || 0);
-            return `Diferenca media de ${avgDiff}% no tempo de resposta`;
+            const rpsDiff = Math.abs(s.requests_per_sec?.diff_percent || 0);
+            return `Tempo medio: ${avgDiff}% de diferenca | Throughput: ${rpsDiff}% de diferenca`;
         });
 
-        function formatNumber(n) {
-            if (n === null || n === undefined) return '-';
-            return typeof n === 'number' ? n.toFixed(2) : n;
+        function fmtNum(n) {
+            if (n == null) return '-';
+            return typeof n === 'number' ? (n % 1 === 0 ? n.toLocaleString('pt-BR') : n.toFixed(2)) : n;
+        }
+        function formatDate(ts) {
+            if (!ts) return '-';
+            try { return new Date(ts).toLocaleString('pt-BR'); } catch { return ts; }
+        }
+        function diffClass(key, diff) {
+            if (diff === 0) return 'neutral';
+            if (lowerIsBetter.has(key)) return diff < 0 ? 'better' : 'worse';
+            return diff > 0 ? 'better' : 'worse';
+        }
+        function addLog(label, text) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const labelClass = label === 'PHP 7.4' ? 'label-74' : label === 'PHP 8.5' ? 'label-85' : 'label-sys';
+            logs.value.push({ label, text, time, labelClass });
+            if (logs.value.length > 500) logs.value.splice(0, 100);
+            nextTick(() => { if (logConsole.value) logConsole.value.scrollTop = logConsole.value.scrollHeight; });
         }
 
-        function getDiffClass(key, diff) {
-            // For response times, negative diff is better (faster)
-            // For requests/sec, positive diff is better (more throughput)
-            if (key === 'requests_per_sec') {
-                return diff > 0 ? 'positive' : 'negative';
+        // ===== Charts =====
+        function destroyCharts() {
+            for (const k in chartInstances) { if (chartInstances[k]) chartInstances[k].destroy(); }
+            chartInstances = {};
+        }
+        function renderCharts() {
+            destroyCharts();
+            if (!result.value?.summary) return;
+            nextTick(() => { renderResponseTimeChart(); renderThroughputChart(); renderLatencyDistChart(); renderRadarChart(); });
+        }
+        function renderResponseTimeChart() {
+            const ctx = chartResponseTime.value; if (!ctx) return;
+            const s = result.value.summary;
+            chartInstances.rt = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Media', 'Mediana', 'P90', 'P95', 'Min', 'Max'],
+                    datasets: [
+                        { label: 'PHP 7.4', data: [s.avg_response_ms?.php74, s.median_response_ms?.php74, s.p90_response_ms?.php74, s.p95_response_ms?.php74, s.min_response_ms?.php74, s.max_response_ms?.php74], backgroundColor: 'rgba(249,115,22,0.7)', borderColor: '#f97316', borderWidth: 1, borderRadius: 4 },
+                        { label: 'PHP 8.5', data: [s.avg_response_ms?.php85, s.median_response_ms?.php85, s.p90_response_ms?.php85, s.p95_response_ms?.php85, s.min_response_ms?.php85, s.max_response_ms?.php85], backgroundColor: 'rgba(34,211,238,0.7)', borderColor: '#22d3ee', borderWidth: 1, borderRadius: 4 },
+                    ],
+                },
+                options: chartOpts('ms'),
+            });
+        }
+        function renderThroughputChart() {
+            const ctx = chartThroughput.value; if (!ctx) return;
+            const s = result.value.summary;
+            chartInstances.tp = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Req/seg', 'Total Reqs', 'Iter/seg', 'Iteracoes'],
+                    datasets: [
+                        { label: 'PHP 7.4', data: [s.requests_per_sec?.php74, s.total_requests?.php74, s.iterations_per_sec?.php74, s.iterations?.php74], backgroundColor: 'rgba(249,115,22,0.7)', borderColor: '#f97316', borderWidth: 1, borderRadius: 4 },
+                        { label: 'PHP 8.5', data: [s.requests_per_sec?.php85, s.total_requests?.php85, s.iterations_per_sec?.php85, s.iterations?.php85], backgroundColor: 'rgba(34,211,238,0.7)', borderColor: '#22d3ee', borderWidth: 1, borderRadius: 4 },
+                    ],
+                },
+                options: chartOpts(''),
+            });
+        }
+        function renderLatencyDistChart() {
+            const ctx = chartLatencyDist.value; if (!ctx) return;
+            const s = result.value.summary;
+            chartInstances.ld = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Min', 'Mediana', 'Media', 'P90', 'P95', 'Max'],
+                    datasets: [
+                        { label: 'PHP 7.4', data: [s.min_response_ms?.php74, s.median_response_ms?.php74, s.avg_response_ms?.php74, s.p90_response_ms?.php74, s.p95_response_ms?.php74, s.max_response_ms?.php74], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#f97316' },
+                        { label: 'PHP 8.5', data: [s.min_response_ms?.php85, s.median_response_ms?.php85, s.avg_response_ms?.php85, s.p90_response_ms?.php85, s.p95_response_ms?.php85, s.max_response_ms?.php85], borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#22d3ee' },
+                    ],
+                },
+                options: chartOpts('ms'),
+            });
+        }
+        function renderRadarChart() {
+            const ctx = chartRadar.value; if (!ctx) return;
+            const s = result.value.summary;
+            const radarKeys = ['avg_response_ms', 'p95_response_ms', 'requests_per_sec', 'iterations_per_sec', 'error_rate'];
+            function norm(key) {
+                const a = s[key]?.php74 || 0, b = s[key]?.php85 || 0;
+                if (a === 0 && b === 0) return [50, 50];
+                const mx = Math.max(a, b) || 1;
+                if (lowerIsBetter.has(key)) return [Math.round(100 - (a / mx * 100)), Math.round(100 - (b / mx * 100))];
+                return [Math.round(a / mx * 100), Math.round(b / mx * 100)];
             }
-            return diff < 0 ? 'positive' : 'negative';
+            chartInstances.rd = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: radarKeys.map(k => metricLabels[k]),
+                    datasets: [
+                        { label: 'PHP 7.4', data: radarKeys.map(k => norm(k)[0]), borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.15)', pointBackgroundColor: '#f97316' },
+                        { label: 'PHP 8.5', data: radarKeys.map(k => norm(k)[1]), borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.15)', pointBackgroundColor: '#22d3ee' },
+                    ],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+                    scales: { r: { ticks: { color: '#64748b', backdropColor: 'transparent', font: { size: 9 } }, grid: { color: '#1e293b' }, angleLines: { color: '#1e293b' }, pointLabels: { color: '#94a3b8', font: { size: 10 } }, suggestedMin: 0, suggestedMax: 100 } },
+                },
+            });
+        }
+        function chartOpts(yTitle) {
+            return {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+                    y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' }, title: yTitle ? { display: true, text: yTitle, color: '#64748b' } : {} },
+                },
+            };
         }
 
-        function getDetailRows(tab) {
-            if (!result.value) return [];
-            const data = tab === 'php74' ? result.value.php74 : result.value.php85;
-            if (!data || !data.metrics) return [];
+        watch(result, (v) => { if (v) { resultTab.value = 'charts'; nextTick(() => renderCharts()); } });
+        watch(resultTab, (v) => { if (v === 'charts' && result.value) nextTick(() => renderCharts()); });
 
-            const m = data.metrics;
-            return [
-                { label: 'Tempo medio (ms)', value: formatNumber(m.http_req_duration?.avg) },
-                { label: 'Tempo minimo (ms)', value: formatNumber(m.http_req_duration?.min) },
-                { label: 'Tempo maximo (ms)', value: formatNumber(m.http_req_duration?.max) },
-                { label: 'Mediana (ms)', value: formatNumber(m.http_req_duration?.med) },
-                { label: 'P90 (ms)', value: formatNumber(m.http_req_duration?.p90) },
-                { label: 'P95 (ms)', value: formatNumber(m.http_req_duration?.p95) },
-                { label: 'Total de requests', value: m.http_reqs?.count || 0 },
-                { label: 'Requests/seg', value: formatNumber(m.http_reqs?.rate) },
-                { label: 'Taxa de erro', value: formatNumber((m.http_req_failed?.rate || 0) * 100) + '%' },
-                { label: 'Iteracoes', value: m.iterations?.count || 0 },
-                { label: 'Iteracoes/seg', value: formatNumber(m.iterations?.rate) },
-            ];
-        }
-
+        // ===== Run =====
         async function runBenchmark() {
-            if (!form.value.url_php74 || !form.value.url_php85) {
-                alert('Preencha as duas URLs!');
-                return;
-            }
-
-            loading.value = true;
-            result.value = null;
-            statusText.value = 'Conectando...';
-            progressPercent.value = 5;
-
+            if (!form.value.url_php74 || !form.value.url_php85) { alert('Preencha as duas URLs!'); return; }
+            loading.value = true; result.value = null; logs.value = [];
+            statusText.value = 'Conectando...'; progressPercent.value = 5;
             try {
-                // Try WebSocket first
                 const socket = io(API_URL, { transports: ['websocket', 'polling'], timeout: 10000 });
-
                 let resolved = false;
-
                 socket.on('connect', () => {
-                    statusText.value = 'Iniciando benchmark PHP 7.4...';
-                    progressPercent.value = 10;
+                    statusText.value = 'Iniciando benchmark PHP 7.4...'; progressPercent.value = 10;
+                    addLog('Sistema', 'Conectado. Iniciando benchmark...');
                     socket.emit('run_compare', form.value);
                 });
-
-                socket.on('status', (data) => {
-                    statusText.value = data.message;
-                    if (data.phase === 'php74') progressPercent.value = 20;
-                    if (data.phase === 'php85') progressPercent.value = 55;
-                    if (data.phase === 'done') progressPercent.value = 90;
+                socket.on('status', (d) => {
+                    statusText.value = d.message;
+                    if (d.percent) progressPercent.value = d.percent;
+                    addLog('Sistema', d.message);
                 });
-
-                socket.on('result', (data) => {
-                    result.value = data;
-                    progressPercent.value = 100;
-                    loading.value = false;
-                    resolved = true;
-                    socket.disconnect();
+                socket.on('log', (d) => {
+                    addLog(d.label, d.line);
+                    if (d.label === 'PHP 7.4') progressPercent.value = Math.min(45, progressPercent.value + 1);
+                    else if (d.label === 'PHP 8.5') progressPercent.value = Math.min(90, progressPercent.value + 1);
                 });
-
+                socket.on('result', (d) => {
+                    result.value = d; progressPercent.value = 100;
+                    statusText.value = 'Concluido!'; loading.value = false; resolved = true;
+                    addLog('Sistema', 'Benchmark concluido!'); socket.disconnect();
+                });
                 socket.on('connect_error', async () => {
-                    if (resolved) return;
-                    socket.disconnect();
-                    // Fallback to REST
-                    await runBenchmarkRest();
+                    if (resolved) return; socket.disconnect();
+                    addLog('Sistema', 'WebSocket indisponivel, usando REST...'); await runRest();
                 });
-
-                // Timeout fallback
                 setTimeout(async () => {
-                    if (!resolved && loading.value) {
-                        socket.disconnect();
-                        await runBenchmarkRest();
-                    }
-                }, 5000);
-
-            } catch (e) {
-                await runBenchmarkRest();
-            }
+                    if (!resolved && progressPercent.value <= 5) { socket.disconnect(); await runRest(); }
+                }, 8000);
+            } catch { await runRest(); }
         }
 
-        async function runBenchmarkRest() {
-            statusText.value = 'Executando via REST API...';
-            progressPercent.value = 15;
-
+        async function runRest() {
+            statusText.value = 'Executando via REST API...'; progressPercent.value = 15;
+            addLog('Sistema', 'Modo REST: enviando requisicao...');
             try {
-                // Simulate progress while waiting
-                const progressInterval = setInterval(() => {
-                    if (progressPercent.value < 85) {
-                        progressPercent.value += 2;
-                    }
-                }, 2000);
-
+                const iv = setInterval(() => { if (progressPercent.value < 85) progressPercent.value += 1; }, 3000);
                 const res = await fetch(`${API_URL}/api/compare`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(form.value),
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form.value),
                 });
-
-                clearInterval(progressInterval);
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Erro na API');
-                }
-
-                result.value = await res.json();
-                progressPercent.value = 100;
-            } catch (e) {
-                statusText.value = 'Erro: ' + e.message;
-                progressPercent.value = 0;
-            } finally {
-                loading.value = false;
-            }
+                clearInterval(iv);
+                if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Erro'); }
+                result.value = await res.json(); progressPercent.value = 100; addLog('Sistema', 'Concluido!');
+            } catch (e) { statusText.value = 'Erro: ' + e.message; addLog('Erro', e.message); }
+            finally { loading.value = false; }
         }
 
+        // ===== History =====
         async function loadHistory() {
+            try { const r = await fetch(`${API_URL}/api/results`); history.value = await r.json(); } catch {}
+        }
+        async function loadHistoryResult(f) {
             try {
-                const res = await fetch(`${API_URL}/api/results`);
-                history.value = await res.json();
-            } catch (e) {
-                console.error('Error loading history:', e);
-            }
+                const r = await fetch(`${API_URL}/api/results/${f}`);
+                result.value = await r.json(); page.value = 'benchmark'; resultTab.value = 'charts';
+            } catch {}
+        }
+        async function deleteResult(f) {
+            if (!confirm('Remover este resultado?')) return;
+            try { await fetch(`${API_URL}/api/results/${f}`, { method: 'DELETE' }); await loadHistory(); } catch {}
         }
 
-        async function loadResult(filename) {
-            try {
-                const res = await fetch(`${API_URL}/api/results/${filename}`);
-                result.value = await res.json();
-                activeTab.value = 'php74';
-            } catch (e) {
-                console.error('Error loading result:', e);
+        // ===== Export =====
+        function exportJSON() {
+            if (!result.value) return;
+            dl(new Blob([JSON.stringify(result.value, null, 2)], { type: 'application/json' }), `benchmark-${result.value.compare_id || 'r'}.json`);
+        }
+        function exportCSV() {
+            if (!result.value?.summary) return;
+            let csv = 'Metrica,PHP 7.4,PHP 8.5,Diferenca %,Vencedor\n';
+            for (const k of allMetricKeys) {
+                const m = result.value.summary[k]; if (!m) continue;
+                csv += `"${metricLabels[k]||k}",${m.php74},${m.php85},${m.diff_percent}%,"${m.winner}"\n`;
             }
+            dl(new Blob([csv], { type: 'text/csv' }), `benchmark-${result.value.compare_id || 'r'}.csv`);
+        }
+        async function exportPDF() {
+            if (!result.value) return;
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            // Header
+            pdf.setFontSize(18); pdf.setTextColor(56, 189, 248);
+            pdf.text('k6 PHP Benchmark - Relatorio', 14, 20);
+            pdf.setFontSize(10); pdf.setTextColor(100);
+            pdf.text(`Data: ${formatDate(result.value.timestamp)}  |  ID: ${result.value.compare_id || '-'}  |  VUs: ${result.value.config?.vus}  |  Duracao: ${result.value.config?.duration}`, 14, 28);
+
+            // Winner
+            pdf.setFontSize(14); pdf.setTextColor(52, 211, 153);
+            pdf.text(`Vencedor: ${overallWinner.value || '-'}`, 14, 40);
+
+            // Table header
+            let y = 52;
+            pdf.setFontSize(9); pdf.setTextColor(80);
+            pdf.text('Metrica', 14, y); pdf.text('PHP 7.4', 80, y); pdf.text('PHP 8.5', 110, y); pdf.text('Diff', 140, y); pdf.text('Vencedor', 165, y);
+            y += 3; pdf.setDrawColor(200); pdf.line(14, y, 196, y); y += 5;
+
+            pdf.setTextColor(40); pdf.setFontSize(9);
+            for (const k of allMetricKeys) {
+                const m = result.value.summary?.[k]; if (!m) continue;
+                pdf.text(metricLabels[k] || k, 14, y);
+                pdf.text(String(fmtNum(m.php74)), 80, y);
+                pdf.text(String(fmtNum(m.php85)), 110, y);
+                pdf.text(`${m.diff_percent}%`, 140, y);
+                pdf.text(m.winner, 165, y);
+                y += 7;
+                if (y > 275) { pdf.addPage(); y = 20; }
+            }
+
+            // Try to capture charts as images
+            try {
+                const chartsEl = document.querySelector('.charts-grid');
+                if (chartsEl) {
+                    const canvas = await html2canvas(chartsEl, { backgroundColor: '#0f172a', scale: 1.5, useCORS: true, logging: false });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgW = 182;
+                    const imgH = (canvas.height * imgW) / canvas.width;
+                    if (y + imgH > 275) { pdf.addPage(); y = 15; }
+                    pdf.addImage(imgData, 'PNG', 14, y, imgW, imgH);
+                }
+            } catch {}
+
+            pdf.save(`benchmark-${result.value.compare_id || 'r'}.pdf`);
+        }
+        function dl(blob, name) {
+            const u = URL.createObjectURL(blob); const a = document.createElement('a');
+            a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u);
         }
 
         return {
-            form, loading, statusText, progressPercent, result, activeTab, history,
-            metricLabels, overallWinner, winnerDescription,
-            formatNumber, getDiffClass, getDetailRows,
-            runBenchmark, loadHistory, loadResult,
+            API_URL, page, resultTab, form,
+            loading, statusText, progressPercent, result, logs, history, logConsole,
+            chartResponseTime, chartThroughput, chartLatencyDist, chartRadar,
+            topMetrics, allMetricKeys, metricLabels, overallWinner, winnerDescription,
+            fmtNum, formatDate, diffClass,
+            runBenchmark, loadHistory, loadHistoryResult, deleteResult,
+            exportJSON, exportCSV, exportPDF,
         };
     }
 }).mount('#app');
