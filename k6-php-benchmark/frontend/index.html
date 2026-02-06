@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>k6 PHP Benchmark - Gran Cursos</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        header {
+            text-align: center;
+            padding: 30px 0 20px;
+            border-bottom: 1px solid #1e293b;
+            margin-bottom: 30px;
+        }
+        header h1 { font-size: 28px; color: #38bdf8; margin-bottom: 6px; }
+        header p { color: #94a3b8; font-size: 14px; }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .form-section {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #334155;
+        }
+        .form-section h3 {
+            font-size: 15px;
+            color: #38bdf8;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-section.full-width { grid-column: 1 / -1; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
+        }
+        .form-group textarea { resize: vertical; min-height: 60px; font-family: monospace; }
+        .form-group .hint { font-size: 11px; color: #64748b; margin-top: 3px; }
+
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            color: white;
+            width: 100%;
+            font-size: 16px;
+            padding: 14px;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Progress */
+        .progress-section {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #334155;
+        }
+        .progress-bar {
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .status-text { color: #94a3b8; font-size: 13px; }
+
+        /* Results */
+        .results-section {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #334155;
+        }
+        .results-section h2 { font-size: 20px; color: #38bdf8; margin-bottom: 20px; }
+
+        .winner-banner {
+            text-align: center;
+            padding: 16px;
+            background: linear-gradient(135deg, #065f46, #064e3b);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #10b981;
+        }
+        .winner-banner h3 { font-size: 18px; color: #34d399; }
+        .winner-banner p { color: #a7f3d0; font-size: 13px; margin-top: 4px; }
+
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+        .metric-card {
+            background: #0f172a;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid #334155;
+        }
+        .metric-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-card .values { display: flex; justify-content: center; gap: 20px; margin: 10px 0; }
+        .metric-card .val { font-size: 22px; font-weight: 700; }
+        .metric-card .val small { font-size: 11px; display: block; color: #94a3b8; font-weight: 400; }
+        .metric-card .diff { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+        .metric-card .diff.positive { background: #064e3b; color: #34d399; }
+        .metric-card .diff.negative { background: #7f1d1d; color: #fca5a5; }
+        .metric-card .winner-tag { font-size: 11px; color: #fbbf24; margin-top: 4px; }
+
+        .php74-color { color: #f97316; }
+        .php85-color { color: #22d3ee; }
+
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .detail-table th, .detail-table td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+            font-size: 13px;
+        }
+        .detail-table th { color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+        .detail-table tr:hover { background: #1e293b; }
+
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+        .tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .tab.active { background: #334155; color: #e2e8f0; border-color: #38bdf8; }
+
+        .history-item {
+            padding: 12px;
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            border: 1px solid #334155;
+            transition: border-color 0.2s;
+        }
+        .history-item:hover { border-color: #38bdf8; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            .form-row, .form-row-3 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container">
+        <header>
+            <h1>k6 PHP Benchmark</h1>
+            <p>Compare performance entre PHP 7.4 e PHP 8.5 - Gran Cursos Online</p>
+        </header>
+
+        <!-- Form -->
+        <div class="form-grid">
+            <!-- URLs -->
+            <div class="form-section">
+                <h3>&#9881; Ambientes</h3>
+                <div class="form-group">
+                    <label>URL PHP 7.4</label>
+                    <input v-model="form.url_php74" type="url"
+                           placeholder="https://dev.grancursosonline.com.br">
+                </div>
+                <div class="form-group">
+                    <label>URL PHP 8.5</label>
+                    <input v-model="form.url_php85" type="url"
+                           placeholder="https://php8-5.grancursosonline.com.br">
+                </div>
+            </div>
+
+            <!-- Test Config -->
+            <div class="form-section">
+                <h3>&#9889; Configuracao do Teste</h3>
+                <div class="form-group">
+                    <label>Tipo de Teste</label>
+                    <select v-model="form.test_type">
+                        <option value="homepage">Homepage (carregamento inicial)</option>
+                        <option value="endpoints">Endpoints especificos</option>
+                        <option value="authenticated">Autenticado (com login)</option>
+                        <option value="full">Completo (homepage + endpoints)</option>
+                    </select>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Usuarios Virtuais (VUs)</label>
+                        <input v-model.number="form.vus" type="number" min="1" max="500">
+                    </div>
+                    <div class="form-group">
+                        <label>Duracao</label>
+                        <select v-model="form.duration">
+                            <option value="10s">10 segundos</option>
+                            <option value="30s">30 segundos</option>
+                            <option value="1m">1 minuto</option>
+                            <option value="2m">2 minutos</option>
+                            <option value="5m">5 minutos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Sleep (s)</label>
+                        <input v-model.number="form.sleep" type="number" min="0" max="5" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Endpoints -->
+            <div class="form-section" v-if="form.test_type !== 'homepage'">
+                <h3>&#128279; Endpoints</h3>
+                <div class="form-group">
+                    <label>Endpoints para testar</label>
+                    <textarea v-model="form.endpoints"
+                              placeholder="/api/cursos,/api/alunos,/dashboard,/login"></textarea>
+                    <div class="hint">Separar por virgula. Ex: /api/cursos,/api/users,/painel</div>
+                </div>
+            </div>
+
+            <!-- Login -->
+            <div class="form-section" v-if="form.test_type === 'authenticated'">
+                <h3>&#128274; Autenticacao</h3>
+                <div class="form-group">
+                    <label>URL de Login</label>
+                    <input v-model="form.login_url" type="url"
+                           placeholder="https://dev.grancursosonline.com.br/api/auth/login">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Usuario / Email</label>
+                        <input v-model="form.login_user" type="text" placeholder="usuario@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Senha</label>
+                        <input v-model="form.login_pass" type="password" placeholder="********">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Campo do usuario (payload)</label>
+                        <input v-model="form.login_user_field" type="text" placeholder="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Campo da senha (payload)</label>
+                        <input v-model="form.login_pass_field" type="text" placeholder="password">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Run Button -->
+        <button class="btn btn-primary" @click="runBenchmark" :disabled="loading">
+            {{ loading ? statusText : 'Executar Benchmark Comparativo' }}
+        </button>
+
+        <!-- Progress -->
+        <div class="progress-section" v-if="loading" style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="status-text">{{ statusText }}</span>
+                <span class="status-text">{{ progressPercent }}%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="results-section" v-if="result" style="margin-top: 24px;">
+            <h2>Resultado da Comparacao</h2>
+
+            <!-- Winner -->
+            <div class="winner-banner" v-if="overallWinner">
+                <h3>{{ overallWinner }} venceu!</h3>
+                <p>{{ winnerDescription }}</p>
+            </div>
+
+            <!-- Summary Metrics -->
+            <div class="metrics-grid">
+                <div class="metric-card" v-for="(metric, key) in result.summary" :key="key">
+                    <div class="label">{{ metricLabels[key] || key }}</div>
+                    <div class="values">
+                        <div class="val php74-color">
+                            {{ formatNumber(metric.php74) }}
+                            <small>PHP 7.4</small>
+                        </div>
+                        <div class="val php85-color">
+                            {{ formatNumber(metric.php85) }}
+                            <small>PHP 8.5</small>
+                        </div>
+                    </div>
+                    <div class="diff" :class="getDiffClass(key, metric.diff_percent)">
+                        {{ metric.diff_percent > 0 ? '+' : '' }}{{ metric.diff_percent }}%
+                    </div>
+                    <div class="winner-tag">{{ metric.winner }}</div>
+                </div>
+            </div>
+
+            <!-- Detail tabs -->
+            <div class="tabs">
+                <button class="tab" :class="{ active: activeTab === 'php74' }" @click="activeTab = 'php74'">
+                    PHP 7.4 - Detalhes
+                </button>
+                <button class="tab" :class="{ active: activeTab === 'php85' }" @click="activeTab = 'php85'">
+                    PHP 8.5 - Detalhes
+                </button>
+                <button class="tab" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'; loadHistory()">
+                    Historico
+                </button>
+            </div>
+
+            <!-- Detail Table -->
+            <table class="detail-table" v-if="activeTab !== 'history'">
+                <thead>
+                    <tr>
+                        <th>Metrica</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="(row, idx) in getDetailRows(activeTab)" :key="idx">
+                        <td>{{ row.label }}</td>
+                        <td>{{ row.value }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- History -->
+            <div v-if="activeTab === 'history'">
+                <div v-if="history.length === 0" style="color: #64748b; text-align: center; padding: 20px;">
+                    Nenhum resultado salvo ainda
+                </div>
+                <div class="history-item" v-for="item in history" :key="item.filename"
+                     @click="loadResult(item.filename)">
+                    <div>
+                        <strong>{{ item.compare_id || item.test_id }}</strong>
+                        <div style="font-size: 12px; color: #64748b;">{{ item.timestamp }}</div>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8;">{{ item.filename }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, computed } = Vue;
+
+createApp({
+    setup() {
+        const API_URL = window.location.protocol + '//' + window.location.hostname + ':5000';
+
+        const form = ref({
+            url_php74: 'https://dev.grancursosonline.com.br',
+            url_php85: 'https://php8-5.grancursosonline.com.br',
+            test_type: 'homepage',
+            vus: 10,
+            duration: '30s',
+            sleep: 0.5,
+            endpoints: '',
+            login_url: '',
+            login_user: '',
+            login_pass: '',
+            login_user_field: 'email',
+            login_pass_field: 'password',
+        });
+
+        const loading = ref(false);
+        const statusText = ref('');
+        const progressPercent = ref(0);
+        const result = ref(null);
+        const activeTab = ref('php74');
+        const history = ref([]);
+
+        const metricLabels = {
+            avg_response_ms: 'Tempo Medio (ms)',
+            p95_response_ms: 'P95 Response (ms)',
+            requests_per_sec: 'Requests/seg',
+        };
+
+        const overallWinner = computed(() => {
+            if (!result.value || !result.value.summary) return null;
+            let php85Wins = 0;
+            let php74Wins = 0;
+            for (const m of Object.values(result.value.summary)) {
+                if (m.winner === 'PHP 8.5') php85Wins++;
+                else php74Wins++;
+            }
+            return php85Wins > php74Wins ? 'PHP 8.5' : 'PHP 7.4';
+        });
+
+        const winnerDescription = computed(() => {
+            if (!result.value || !result.value.summary) return '';
+            const s = result.value.summary;
+            const avgDiff = Math.abs(s.avg_response_ms?.diff_percent || 0);
+            return `Diferenca media de ${avgDiff}% no tempo de resposta`;
+        });
+
+        function formatNumber(n) {
+            if (n === null || n === undefined) return '-';
+            return typeof n === 'number' ? n.toFixed(2) : n;
+        }
+
+        function getDiffClass(key, diff) {
+            // For response times, negative diff is better (faster)
+            // For requests/sec, positive diff is better (more throughput)
+            if (key === 'requests_per_sec') {
+                return diff > 0 ? 'positive' : 'negative';
+            }
+            return diff < 0 ? 'positive' : 'negative';
+        }
+
+        function getDetailRows(tab) {
+            if (!result.value) return [];
+            const data = tab === 'php74' ? result.value.php74 : result.value.php85;
+            if (!data || !data.metrics) return [];
+
+            const m = data.metrics;
+            return [
+                { label: 'Tempo medio (ms)', value: formatNumber(m.http_req_duration?.avg) },
+                { label: 'Tempo minimo (ms)', value: formatNumber(m.http_req_duration?.min) },
+                { label: 'Tempo maximo (ms)', value: formatNumber(m.http_req_duration?.max) },
+                { label: 'Mediana (ms)', value: formatNumber(m.http_req_duration?.med) },
+                { label: 'P90 (ms)', value: formatNumber(m.http_req_duration?.p90) },
+                { label: 'P95 (ms)', value: formatNumber(m.http_req_duration?.p95) },
+                { label: 'Total de requests', value: m.http_reqs?.count || 0 },
+                { label: 'Requests/seg', value: formatNumber(m.http_reqs?.rate) },
+                { label: 'Taxa de erro', value: formatNumber((m.http_req_failed?.rate || 0) * 100) + '%' },
+                { label: 'Iteracoes', value: m.iterations?.count || 0 },
+                { label: 'Iteracoes/seg', value: formatNumber(m.iterations?.rate) },
+            ];
+        }
+
+        async function runBenchmark() {
+            if (!form.value.url_php74 || !form.value.url_php85) {
+                alert('Preencha as duas URLs!');
+                return;
+            }
+
+            loading.value = true;
+            result.value = null;
+            statusText.value = 'Conectando...';
+            progressPercent.value = 5;
+
+            try {
+                // Try WebSocket first
+                const socket = io(API_URL, { transports: ['websocket', 'polling'], timeout: 10000 });
+
+                let resolved = false;
+
+                socket.on('connect', () => {
+                    statusText.value = 'Iniciando benchmark PHP 7.4...';
+                    progressPercent.value = 10;
+                    socket.emit('run_compare', form.value);
+                });
+
+                socket.on('status', (data) => {
+                    statusText.value = data.message;
+                    if (data.phase === 'php74') progressPercent.value = 20;
+                    if (data.phase === 'php85') progressPercent.value = 55;
+                    if (data.phase === 'done') progressPercent.value = 90;
+                });
+
+                socket.on('result', (data) => {
+                    result.value = data;
+                    progressPercent.value = 100;
+                    loading.value = false;
+                    resolved = true;
+                    socket.disconnect();
+                });
+
+                socket.on('connect_error', async () => {
+                    if (resolved) return;
+                    socket.disconnect();
+                    // Fallback to REST
+                    await runBenchmarkRest();
+                });
+
+                // Timeout fallback
+                setTimeout(async () => {
+                    if (!resolved && loading.value) {
+                        socket.disconnect();
+                        await runBenchmarkRest();
+                    }
+                }, 5000);
+
+            } catch (e) {
+                await runBenchmarkRest();
+            }
+        }
+
+        async function runBenchmarkRest() {
+            statusText.value = 'Executando via REST API...';
+            progressPercent.value = 15;
+
+            try {
+                // Simulate progress while waiting
+                const progressInterval = setInterval(() => {
+                    if (progressPercent.value < 85) {
+                        progressPercent.value += 2;
+                    }
+                }, 2000);
+
+                const res = await fetch(`${API_URL}/api/compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(form.value),
+                });
+
+                clearInterval(progressInterval);
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erro na API');
+                }
+
+                result.value = await res.json();
+                progressPercent.value = 100;
+            } catch (e) {
+                statusText.value = 'Erro: ' + e.message;
+                progressPercent.value = 0;
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch(`${API_URL}/api/results`);
+                history.value = await res.json();
+            } catch (e) {
+                console.error('Error loading history:', e);
+            }
+        }
+
+        async function loadResult(filename) {
+            try {
+                const res = await fetch(`${API_URL}/api/results/${filename}`);
+                result.value = await res.json();
+                activeTab.value = 'php74';
+            } catch (e) {
+                console.error('Error loading result:', e);
+            }
+        }
+
+        return {
+            form, loading, statusText, progressPercent, result, activeTab, history,
+            metricLabels, overallWinner, winnerDescription,
+            formatNumber, getDiffClass, getDetailRows,
+            runBenchmark, loadHistory, loadResult,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
