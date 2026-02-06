@@ -21,6 +21,13 @@ RESULTS_DIR.mkdir(exist_ok=True)
 K6_SCRIPT = "/app/k6/benchmark.js"
 
 
+def clean_url(url):
+    """Remove port from URL (e.g. :80, :443) to avoid redirect issues."""
+    if not url:
+        return url
+    return re.sub(r'^(https?://[^/:]+):\d+(/|$)', r'\1\2', url)
+
+
 def parse_k6_progress(line):
     """Parse k6 stderr progress lines into structured data."""
     # k6 outputs progress like: running (0m30s), 10/10 VUs, 285 complete and 0 interrupted
@@ -40,7 +47,7 @@ def parse_k6_progress(line):
 def run_k6_test_streaming(test_id, config, sid=None, label=""):
     """Execute k6 test with real-time log streaming via WebSocket."""
     env = os.environ.copy()
-    env["TARGET_URL"] = config["target_url"]
+    env["TARGET_URL"] = clean_url(config["target_url"])
     env["TEST_TYPE"] = config.get("test_type", "homepage")
     env["VUS"] = str(config.get("vus", 10))
     env["DURATION"] = config.get("duration", "30s")
@@ -50,7 +57,7 @@ def run_k6_test_streaming(test_id, config, sid=None, label=""):
         env["ENDPOINTS"] = config["endpoints"]
 
     if config.get("login_url"):
-        env["LOGIN_URL"] = config["login_url"]
+        env["LOGIN_URL"] = clean_url(config["login_url"])
         env["LOGIN_USER"] = config.get("login_user", "")
         env["LOGIN_PASS"] = config.get("login_pass", "")
         env["LOGIN_USER_FIELD"] = config.get("login_user_field", "email")

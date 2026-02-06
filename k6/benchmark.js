@@ -5,10 +5,17 @@ import { Rate, Trend } from 'k6/metrics';
 const errorRate = new Rate('errors');
 const respTime = new Trend('resp_time', true);
 
-const BASE_URL = __ENV.TARGET_URL;
+// Remove port from URL (e.g. :80, :443)
+// Fixes redirects like https://site.com.br:80/path
+function cleanUrl(url) {
+    if (!url) return url;
+    return url.replace(/^(https?:\/\/[^/:]+):\d+(\/|$)/, '$1$2');
+}
+
+const BASE_URL = cleanUrl(__ENV.TARGET_URL);
 const TEST_TYPE = __ENV.TEST_TYPE || 'homepage';
 const ENDPOINTS = __ENV.ENDPOINTS ? __ENV.ENDPOINTS.split(',') : ['/'];
-const LOGIN_URL = __ENV.LOGIN_URL || '';
+const LOGIN_URL = cleanUrl(__ENV.LOGIN_URL || '');
 const LOGIN_USER = __ENV.LOGIN_USER || '';
 const LOGIN_PASS = __ENV.LOGIN_PASS || '';
 const LOGIN_USER_FIELD = __ENV.LOGIN_USER_FIELD || 'email';
@@ -139,7 +146,7 @@ export default function (data) {
         ENDPOINTS.forEach((endpoint) => {
             const ep = endpoint.trim();
             group(`Endpoint: ${ep}`, () => {
-                const url = ep.startsWith('http') ? ep : `${BASE_URL}${ep}`;
+                const url = cleanUrl(ep.startsWith('http') ? ep : `${BASE_URL}${ep}`);
                 const res = http.get(url, params);
                 check(res, {
                     [`${ep} status OK`]: (r) => r.status >= 200 && r.status < 400,
@@ -165,7 +172,7 @@ export default function (data) {
             const ep = endpoint.trim();
             if (ep && ep !== '/') {
                 group(`Endpoint: ${ep}`, () => {
-                    const url = ep.startsWith('http') ? ep : `${BASE_URL}${ep}`;
+                    const url = cleanUrl(ep.startsWith('http') ? ep : `${BASE_URL}${ep}`);
                     const res = http.get(url, params);
                     check(res, {
                         [`${ep} OK`]: (r) => r.status >= 200 && r.status < 400,
