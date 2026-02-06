@@ -29,42 +29,79 @@ let authToken = null;
 
 export function setup() {
     if (TEST_TYPE === 'authenticated' && LOGIN_URL && LOGIN_USER) {
-        console.log(`Authenticating at: ${LOGIN_URL}`);
+        console.log(`[LOGIN] Tentando autenticacao em: ${LOGIN_URL}`);
+        console.log(`[LOGIN] Usuario: ${LOGIN_USER}`);
+        console.log(`[LOGIN] Campos: ${LOGIN_USER_FIELD}/${LOGIN_PASS_FIELD}`);
 
         const loginPayload = {};
         loginPayload[LOGIN_USER_FIELD] = LOGIN_USER;
         loginPayload[LOGIN_PASS_FIELD] = LOGIN_PASS;
 
         // Try JSON login first
+        console.log('[LOGIN] Tentando login via JSON...');
         let res = http.post(LOGIN_URL, JSON.stringify(loginPayload), {
             headers: { 'Content-Type': 'application/json' },
             redirects: 0,
         });
+        let loginMethod = 'JSON';
 
         // If JSON didn't work (non-2xx), try form-encoded
         if (res.status >= 400) {
+            console.log(`[LOGIN] JSON retornou ${res.status}, tentando form-encoded...`);
             res = http.post(LOGIN_URL, loginPayload, {
                 redirects: 0,
             });
+            loginMethod = 'form-encoded';
         }
+
+        console.log(`[LOGIN] Status HTTP: ${res.status} (via ${loginMethod})`);
 
         const cookies = res.cookies;
         let token = null;
 
+        // Count cookies received
+        const cookieNames = Object.keys(cookies || {});
+        if (cookieNames.length > 0) {
+            console.log(`[LOGIN] Cookies recebidos (${cookieNames.length}): ${cookieNames.join(', ')}`);
+        } else {
+            console.log('[LOGIN] Nenhum cookie recebido');
+        }
+
         // Try to extract token from response body
         try {
             const body = JSON.parse(res.body);
-            token = body.token || body.access_token || body.jwt || null;
+            token = body.token || body.access_token || body.jwt || body.data?.token || body.data?.access_token || null;
+            if (token) {
+                console.log(`[LOGIN] TOKEN OBTIDO com sucesso (${token.substring(0, 20)}...)`);
+            } else {
+                console.log('[LOGIN] Resposta JSON parseada, mas nenhum campo de token encontrado');
+                console.log(`[LOGIN] Campos disponiveis: ${Object.keys(body).join(', ')}`);
+            }
         } catch (e) {
             // Not JSON, check for token in headers
             const authHeader = res.headers['Authorization'] || res.headers['authorization'];
             if (authHeader) {
                 token = authHeader.replace('Bearer ', '');
+                console.log(`[LOGIN] Token obtido via header Authorization`);
+            } else {
+                console.log('[LOGIN] Resposta nao e JSON e sem header Authorization');
             }
         }
 
-        console.log(`Login status: ${res.status}`);
-        return { cookies, token };
+        // Final login status
+        const isSuccess = res.status >= 200 && res.status < 400;
+        const hasAuth = token || cookieNames.length > 0;
+
+        if (isSuccess && hasAuth) {
+            console.log(`[LOGIN] *** LOGIN BEM SUCEDIDO *** (HTTP ${res.status}, ${token ? 'com token' : `com ${cookieNames.length} cookies`})`);
+        } else if (isSuccess) {
+            console.log(`[LOGIN] *** ATENCAO: HTTP ${res.status} mas sem token/cookies - autenticacao pode ter falhado ***`);
+        } else {
+            console.log(`[LOGIN] *** LOGIN FALHOU *** (HTTP ${res.status})`);
+            console.log(`[LOGIN] Response body (primeiros 500 chars): ${(res.body || '').substring(0, 500)}`);
+        }
+
+        return { cookies, token, loginSuccess: isSuccess && hasAuth };
     }
     return {};
 }
