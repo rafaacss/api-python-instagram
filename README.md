@@ -1,259 +1,84 @@
-# 🎬 INSTAGRAM API - ARQUIVOS CORRIGIDOS
+# k6 PHP Benchmark - Gran Cursos Online
 
-> Solução completa para o erro "Failed to load resource" e problemas de carregamento de mídia do Instagram
+Ferramenta para comparar performance entre ambientes PHP 7.4 e PHP 8.5 usando k6 como engine de load testing.
 
----
+## Arquitetura
 
-## 📦 O QUE VOCÊ RECEBEU
+```
+frontend (Vue.js/Nginx :8080)  -->  api (Python/Flask :5000)  -->  k6 (load testing)
+                                                                       |
+                                                               URLs externas:
+                                                         dev.grancursosonline.com.br
+                                                         php8-5.grancursosonline.com.br
+```
 
-16 arquivos prontos para copiar e colar:
-- ✅ 7 arquivos Python corrigidos
-- ✅ 1 arquivo JSON de exemplo
-- ✅ 5 scripts de teste e diagnóstico
-- ✅ 4 guias de implementação
+## Como usar
 
----
+### 1. Subir os containers
 
-## 🚀 INÍCIO RÁPIDO (5 MINUTOS)
-
-### 1. Rodar Diagnóstico
 ```bash
-python quick_fix.py
+cd k6-php-benchmark
+docker compose up -d --build
 ```
 
-### 2. Copiar Arquivo JSON
+### 2. Acessar a interface
+
+Abra `http://localhost:8080` no navegador.
+
+### 3. Configurar o teste
+
+- **URL PHP 7.4**: ex: `https://dev.grancursosonline.com.br`
+- **URL PHP 8.5**: ex: `https://php8-5.grancursosonline.com.br`
+- **Tipo de teste**:
+  - `Homepage` - testa carregamento da pagina inicial
+  - `Endpoints` - testa endpoints especificos
+  - `Autenticado` - faz login e testa endpoints autenticados
+  - `Completo` - homepage + endpoints
+- **VUs** - usuarios virtuais simultaneos
+- **Duracao** - tempo do teste
+- **Endpoints** - lista separada por virgula (ex: `/api/cursos,/dashboard`)
+- **Login** - credenciais para testes autenticados
+
+### 4. Executar
+
+Clique em "Executar Benchmark Comparativo" e aguarde os resultados.
+
+## API REST
+
+| Metodo | Endpoint | Descricao |
+|--------|----------|-----------|
+| POST | `/api/compare` | Executa benchmark comparativo |
+| POST | `/api/test` | Executa teste unico |
+| GET | `/api/results` | Lista resultados salvos |
+| GET | `/api/results/:file` | Retorna resultado especifico |
+
+### Exemplo via curl
+
 ```bash
-cp mock_posts.json static/instagram/
+curl -X POST http://localhost:5000/api/compare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url_php74": "https://dev.grancursosonline.com.br",
+    "url_php85": "https://php8-5.grancursosonline.com.br",
+    "test_type": "homepage",
+    "vus": 10,
+    "duration": "30s"
+  }'
 ```
 
-### 3. Atualizar Arquivos Python
-Veja tabela abaixo de onde copiar cada arquivo.
-
-### 4. Reiniciar Flask e Testar
-```bash
-python test_endpoints.py
-```
-
----
-
-## 📋 ÍNDICE DE ARQUIVOS
-
-### 📝 GUIAS DE IMPLEMENTAÇÃO (LEIA PRIMEIRO)
-
-| Arquivo | Para | Descrição |
-|---------|------|-----------|
-| **RESUMO_FINAL.md** | 📖 Leitura | ⭐ COMECE AQUI - Sumário geral com checklist |
-| **PASSO_A_PASSO.md** | 📖 Leitura | Instruções detalhadas para copiar cada arquivo |
-| **DEBUG_GUIDE.md** | 📖 Referência | Guia de debugging e troubleshooting |
-| **IMPLEMENTACAO.md** | 📖 Referência | Instruções técnicas e mudanças implementadas |
-
-### 🔴 ARQUIVOS PYTHON CRÍTICOS
-
-| Arquivo | Copiar Para | Descrição |
-|---------|------------|-----------|
-| `init_app.py` | `src/app/__init__.py` | **⚠️ RENOMEAR!** Inicialização com logging |
-| `extensions.py` | `src/app/extensions.py` | CORS com headers adicionais |
-| `media_cache.py` | `src/app/services/media_cache.py` | Cache com melhor detecção de tipos |
-| `instagram.py` | `src/app/routes/instagram.py` | Rotas com logging extensivo |
-| `static_files.py` | `src/app/routes/static_files.py` | Servidor de arquivos estáticos |
-| `admin.py` | `src/app/routes/admin.py` | Admin routes |
-| `warmup.py` | `src/app/services/warmup.py` | Warm-up com logging |
-
-### 🟡 ARQUIVO DE DADOS
-
-| Arquivo | Copiar Para | Descrição |
-|---------|------------|-----------|
-| `mock_posts.json` | `static/instagram/mock_posts.json` | Dados de teste para posts |
-
-### 🟢 SCRIPTS DE TESTE
-
-| Arquivo | Usar Como | Descrição |
-|---------|-----------|-----------|
-| `quick_fix.py` | `./quick_fix.py` | Diagnóstico rápido (RODE PRIMEIRO) |
-| `test_endpoints.py` | `./test_endpoints.py` | Testa todos os endpoints |
-| `check_structure.py` | `./check_structure.py` | Verifica estrutura de diretórios |
-
-### 🔵 CONFIGURAÇÃO AVANÇADA (OPCIONAL)
-
-| Arquivo | Copiar Para | Descrição |
-|---------|------------|-----------|
-| `logging_config.py` | `src/app/logging_config.py` | Logging com rotação de arquivos |
-
----
-
-## 📊 ESTRUTURA FINAL ESPERADA
+## Estrutura
 
 ```
-seu-projeto/
-├── 📄 GUIAS (leia antes de implementar)
-│   ├── RESUMO_FINAL.md ← COMECE AQUI
-│   ├── PASSO_A_PASSO.md
-│   ├── DEBUG_GUIDE.md
-│   └── IMPLEMENTACAO.md
-│
-├── 🔧 SCRIPTS (execute para testar/diagnosticar)
-│   ├── quick_fix.py
-│   ├── test_endpoints.py
-│   └── check_structure.py
-│
-├── src/app/
-│   ├── __init__.py ✅ (de init_app.py)
-│   ├── config.py
-│   ├── extensions.py ✅ (ATUALIZAR)
-│   ├── services/
-│   │   ├── cache.py
-│   │   ├── http.py
-│   │   ├── instagram.py
-│   │   ├── media_cache.py ✅ (ATUALIZAR)
-│   │   └── warmup.py ✅ (ATUALIZAR)
-│   └── routes/
-│       ├── admin.py ✅ (ATUALIZAR)
-│       ├── google.py
-│       ├── health.py
-│       ├── instagram.py ✅ (ATUALIZAR)
-│       └── static_files.py ✅ (ATUALIZAR)
-│
-├── static/
-│   └── instagram/
-│       ├── mock_posts.json ✅ (COPIAR)
-│       └── ... outros arquivos
-│
-├── cache/instagram/
-├── logs/
-└── .env
+k6-php-benchmark/
+  api/
+    app.py              # Backend Flask + SocketIO
+    requirements.txt
+    Dockerfile
+  frontend/
+    index.html          # Vue.js SPA
+    Dockerfile
+  k6/
+    benchmark.js        # Script k6 com suporte a login
+  results/              # Resultados salvos (JSON)
+  docker-compose.yml
 ```
-
----
-
-## 🎯 ORDEM DE IMPLEMENTAÇÃO
-
-### Passo 1️⃣: Preparar
-```bash
-python quick_fix.py  # Criar diretórios faltantes
-```
-
-### Passo 2️⃣: Copiar Dados
-```bash
-cp mock_posts.json static/instagram/
-```
-
-### Passo 3️⃣: Atualizar Python (7 arquivos)
-```bash
-# Na ordem:
-cp init_app.py src/app/__init__.py
-cp extensions.py src/app/
-cp media_cache.py src/app/services/
-cp warmup.py src/app/services/
-cp static_files.py src/app/routes/
-cp instagram.py src/app/routes/
-cp admin.py src/app/routes/
-```
-
-### Passo 4️⃣: Testar
-```bash
-python test_endpoints.py
-```
-
----
-
-## ✅ VERIFICAÇÃO
-
-### Teste Rápido
-```bash
-python quick_fix.py
-```
-Tudo verde? ✓
-
-### Teste Completo
-```bash
-python test_endpoints.py
-```
-Todos passaram? ✓
-
-### No Navegador (F12)
-- Network tab: tudo em verde? ✓
-- Console: sem erros vermelhos? ✓
-
----
-
-## 🔍 PROBLEMAS COMUNS
-
-### "Failed to load resource: net::ERR_FAILED"
-```bash
-# Verifique se arquivo existe
-ls static/instagram/mock_posts.json
-
-# Teste
-curl http://localhost:5000/static/instagram/mock_posts.json
-```
-
-### "ModuleNotFoundError: No module named..."
-```bash
-# Verifique se renomeou init_app.py para __init__.py
-ls src/app/__init__.py
-```
-
-### "Permission denied" no cache
-```bash
-chmod 755 cache/instagram
-```
-
-### URLs com "thumb=1:1" (incorretas)
-- Problema no JavaScript do frontend
-- Verifique se não tem `:1` extras nas URLs
-
----
-
-## 📚 DOCUMENTAÇÃO
-
-### Para Implementar
-1. Leia: **RESUMO_FINAL.md**
-2. Siga: **PASSO_A_PASSO.md**
-
-### Para Troubleshooting
-1. Execute: `python quick_fix.py`
-2. Leia: **DEBUG_GUIDE.md**
-
-### Para Entender as Mudanças
-- Leia: **IMPLEMENTACAO.md**
-
----
-
-## 💡 DICAS
-
-1. **Use DevTools (F12)** para ver exatamente qual requisição falha
-2. **Execute os scripts** antes de perguntar - eles vão diagnosticar tudo
-3. **Leia os logs** do Flask - eles dizem exatamente o que está errado
-4. **Teste com curl** para requests mais rápidas
-
----
-
-## 🎬 O QUE FOI CORRIGIDO
-
-✅ Melhor detecção de tipos de arquivo (MP4, imagens)  
-✅ CORS com suporte correto a Range requests  
-✅ Logging extensivo em todas operações  
-✅ Validação melhorada de URLs  
-✅ Tratamento robusto de erros  
-✅ Suporte a vários tipos de vídeo  
-✅ Cache com renovação inteligente  
-
----
-
-## 📞 PRÓXIMOS PASSOS
-
-1. **Leia** RESUMO_FINAL.md
-2. **Execute** `python quick_fix.py`
-3. **Siga** PASSO_A_PASSO.md
-4. **Teste** com `python test_endpoints.py`
-5. **Verifique** no navegador (F12)
-
----
-
-## 🎉 VOCÊ ESTÁ PRONTO!
-
-Todos os arquivos estão aqui. É só copiar e colar.
-
-**Tempo estimado:** 5 minutos ⏱️
-
-Bom sorte! 🚀
